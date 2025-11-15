@@ -1,0 +1,57 @@
+[package]
+name = "backup-service"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "PostgreSQL backup management system with CLI interface"
+
+[[bin]]
+name = "backup-service"
+path = "src/main.rs"
+
+[dependencies]
+# CLI and user interaction
+clap = { version = "4.0", features = ["derive"] }
+inquire = "0.6"
+
+# Database
+tokio-postgres = "0.7"
+postgres = "0.19"
+
+# HTTP server for REST endpoint
+axum = "0.7"
+tokio = { version = "1.0", features = ["full"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors"] }
+
+# JSON handling
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Date and time
+chrono = { version = "0.4", features = ["serde"] }
+
+# File operations and paths
+directories = "5.0"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+log = "0.4"
+env_logger = "0.10"
+
+# Telegram notifications (optional)
+teloxide = { version = "0.12", features = ["macros"], optional = true }
+
+# Async runtime
+futures = "0.3"
+
+
+[features]
+default = ["telegram"]
+telegram = ["teloxide"]
+
+[dev-dependencies]
+tempfile = "3.0"

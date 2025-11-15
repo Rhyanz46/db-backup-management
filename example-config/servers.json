@@ -1,0 +1,24 @@
+{
+  "production_db": {
+    "name": "production_db",
+    "host": "localhost",
+    "port": 5432,
+    "database": "myapp_prod",
+    "username": "backup_user",
+    "password": "your_password_here",
+    "version": null,
+    "total_schemas": null,
+    "is_active": true
+  },
+  "staging_db": {
+    "name": "staging_db",
+    "host": "staging.example.com",
+    "port": 5432,
+    "database": "myapp_staging",
+    "username": "backup_user",
+    "password": "your_password_here",
+    "version": null,
+    "total_schemas": null,
+    "is_active": false
+  }
+}
