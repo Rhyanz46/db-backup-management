@@ -1,0 +1,43 @@
+[Unit]
+Description=PostgreSQL Backup Management Service
+Documentation=https://github.com/your-repo/backup-service
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User={{SERVICE_USER}}
+Group={{SERVICE_USER}}
+WorkingDirectory=/var/lib/backup-service
+Environment="RUST_LOG=info"
+Environment="RUST_BACKTRACE=1"
+
+# Main executable command with port configuration
+ExecStart={{EXEC_PATH}} server \
+  --config-dir {{CONFIG_DIR}} \
+  --backup-dir {{BACKUP_DIR}} \
+  --port {{SERVICE_PORT}}
+
+# Restart configuration
+Restart=always
+RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=3
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{CONFIG_DIR}} {{BACKUP_DIR}}
+
+# Resource limits
+LimitNOFILE=65536
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=backup-service
+
+[Install]
+WantedBy=multi-user.target

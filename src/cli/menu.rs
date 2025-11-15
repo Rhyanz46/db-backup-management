@@ -40,7 +40,6 @@ impl CliInterface {
                 "C. Backup Details",
                 "D. Manage Servers",
                 "E. Notification Settings",
-                "F. Start REST API Server",
                 "Q. Quit",
             ];
 
@@ -54,7 +53,6 @@ impl CliInterface {
                 "C. Backup Details" => self.backup_details().await?,
                 "D. Manage Servers" => self.manage_servers().await?,
                 "E. Notification Settings" => self.notification_settings()?,
-                "F. Start REST API Server" => self.start_rest_server().await?,
                 "Q. Quit" => {
                     println!("Goodbye! 👋");
                     break;
@@ -638,18 +636,5 @@ impl CliInterface {
         println!("✅ Telegram notifications configured successfully.");
 
         Ok(())
-    }
-
-    async fn start_rest_server(&mut self) -> Result<()> {
-        let active_server = self.server_manager.get_active_server()
-            .ok_or_else(|| anyhow::anyhow!("No active server configured for REST endpoint"))?;
-
-        println!("Starting REST API server...");
-        println!("Active server: {}", active_server.display_name());
-        println!("Backup endpoint: POST /backup");
-        println!("Press Ctrl+C to stop the server\n");
-
-        // Start the server directly
-        crate::api::start_rest_server().await
     }
 }

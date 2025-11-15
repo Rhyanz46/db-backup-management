@@ -31,6 +31,10 @@ struct Cli {
     #[arg(long, default_value = "./backup")]
     backup_dir: String,
 
+    /// Port for REST API server (default: 8080)
+    #[arg(long, default_value = "8080")]
+    port: u16,
+
     /// Enable debug logging
     #[arg(short, long)]
     debug: bool,
@@ -89,8 +93,8 @@ async fn main() -> Result<()> {
             cli_interface.run().await?;
         }
         Commands::Server => {
-            info!("Starting REST API server");
-            api::start_rest_server().await?;
+            info!("Starting REST API server on port {}", cli.port);
+            api::start_rest_server(&cli.config_dir, &cli.backup_dir, cli.port).await?;
         }
         Commands::Backup => {
             info!("Creating backup from active server");

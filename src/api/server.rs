@@ -34,22 +34,10 @@ pub struct AppState {
     pub backup_dir: Arc<String>,
 }
 
-pub async fn start_rest_server() -> Result<()> {
-    let config_dir = std::env::current_dir()
-        .context("Failed to get current directory")?
-        .join("config")
-        .to_string_lossy()
-        .to_string();
-
-    let backup_dir = std::env::current_dir()
-        .context("Failed to get current directory")?
-        .join("backup")
-        .to_string_lossy()
-        .to_string();
-
+pub async fn start_rest_server(config_dir: &str, backup_dir: &str, port: u16) -> Result<()> {
     let app_state = AppState {
-        config_dir: Arc::new(config_dir),
-        backup_dir: Arc::new(backup_dir),
+        config_dir: Arc::new(config_dir.to_string()),
+        backup_dir: Arc::new(backup_dir.to_string()),
     };
 
     let app = Router::new()
@@ -59,7 +47,8 @@ pub async fn start_rest_server() -> Result<()> {
         .route("/backup", get(list_backups))
         .with_state(app_state);
 
-    let listener = TcpListener::bind("0.0.0.0:8080").await?;
+    let addr = format!("0.0.0.0:{}", port);
+    let listener = TcpListener::bind(&addr).await?;
 
     println!("🚀 REST API Server started on {}", listener.local_addr()?);
     println!("📡 Available endpoints:");

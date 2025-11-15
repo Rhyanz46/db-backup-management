@@ -39,21 +39,46 @@ A comprehensive CLI-based PostgreSQL backup management system written in Rust wi
 ```bash
 git clone <repository-url>
 cd backup-service
-cargo build --release
+make build
 ```
 
 The compiled binary will be available at `target/release/backup-service`.
 
 ## Usage
 
-### Interactive CLI Mode
+### Using Makefile (Recommended)
+
+```bash
+# Build the project
+make build
+
+# Run interactive CLI
+make run-cli
+
+# Run REST server on default port (8080)
+make run-server
+
+# Run REST server with custom port
+make run-server-port
+
+# Install as systemd service
+make install
+
+# View all available commands
+make help
+```
+
+### Direct Binary Usage
 
 ```bash
 # Start interactive menu
 ./backup-service run
 
-# Start REST API server
+# Start REST API server on default port (8080)
 ./backup-service server
+
+# Start REST API server on custom port
+./backup-service server --port 9000
 
 # Quick backup of active server
 ./backup-service backup
@@ -79,7 +104,11 @@ The compiled binary will be available at `target/release/backup-service`.
 Start the REST server:
 
 ```bash
-./backup-service server
+# Using Makefile
+make run-server
+
+# Direct binary usage
+./backup-service server --port 8080
 ```
 
 #### Endpoints
@@ -99,6 +128,57 @@ curl -X POST http://localhost:8080/backup
 
 # List backups
 curl http://localhost:8080/backup
+```
+
+## Systemd Deployment
+
+### Installation as System Service
+
+```bash
+# Install binary and create systemd service
+make install
+
+# Start the service
+sudo systemctl start backup-service
+
+# Check service status
+sudo systemctl status backup-service
+
+# View logs
+sudo journalctl -u backup-service -f
+```
+
+### Service Configuration
+
+The systemd service will be installed with the following defaults:
+- **User**: `backup-service`
+- **Config Directory**: `/var/lib/backup-service/config`
+- **Backup Directory**: `/var/lib/backup-service/backup`
+- **Port**: `8080`
+
+### Custom Installation
+
+You can customize installation variables:
+
+```bash
+# Install with custom port and user
+make install SERVICE_PORT=9000 SERVICE_USER=myuser
+```
+
+### Service Management
+
+```bash
+# Start/stop service
+sudo systemctl start backup-service
+sudo systemctl stop backup-service
+sudo systemctl restart backup-service
+
+# Enable/disable auto-start
+sudo systemctl enable backup-service
+sudo systemctl disable backup-service
+
+# View logs
+sudo journalctl -u backup-service -f
 ```
 
 ## Configuration
@@ -146,7 +226,7 @@ Servers can be added through the interactive CLI or by editing `config/servers.j
 ### Main Commands
 
 - **`run`**: Start interactive CLI mode with menu system
-- **`server`**: Start REST API server on port 8080
+- **`server`**: Start REST API server (default port 8080)
 - **`backup`**: Create backup of all schemas from active server
 - **`list`**: Display all available backups
 - **`details <filename>`**: Show detailed backup information
@@ -159,6 +239,7 @@ Servers can be added through the interactive CLI or by editing `config/servers.j
 
 - **`--config-dir <path>`**: Configuration directory (default: `./config`)
 - **`--backup-dir <path>`**: Backup directory (default: `./backup`)
+- **`--port <number>`**: Port for REST API server (default: `8080`)
 - **`--debug`**: Enable debug logging
 
 ## Interactive Menu
@@ -175,7 +256,6 @@ Select an option:
   C. Backup Details
   D. Manage Servers
   E. Notification Settings
-  F. Start REST API Server
   Q. Quit
 ```
 
