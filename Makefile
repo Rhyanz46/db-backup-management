@@ -99,6 +99,53 @@ uninstall:
 
 	@echo "Uninstallation completed!"
 
+# Install system dependencies (Linux)
+.PHONY: install-deps
+install-deps:
+	@if command -v apt-get >/dev/null 2>&1; then \
+		echo "Installing dependencies for Debian/Ubuntu..."; \
+		sudo apt-get update && sudo apt-get install -y \
+			pkg-config \
+			libssl-dev \
+			postgresql-client \
+			build-essential; \
+	elif command -v yum >/dev/null 2>&1; then \
+		echo "Installing dependencies for RHEL/CentOS..."; \
+		sudo yum groupinstall -y "Development Tools" && \
+		sudo yum install -y \
+			pkgconfig \
+			openssl-devel \
+			postgresql; \
+	elif command -v dnf >/dev/null 2>&1; then \
+		echo "Installing dependencies for Fedora..."; \
+		sudo dnf groupinstall -y "Development Tools" && \
+		sudo dnf install -y \
+			pkgconfig \
+			openssl-devel \
+			postgresql; \
+	elif command -v pacman >/dev/null 2>&1; then \
+		echo "Installing dependencies for Arch Linux..."; \
+		sudo pacman -S --needed \
+			pkgconf \
+			openssl \
+			postgresql; \
+	else \
+		echo "Unknown package manager. Please install manually:"; \
+		echo "  - pkg-config"; \
+		echo "  - OpenSSL development headers (libssl-dev or openssl-devel)"; \
+		echo "  - PostgreSQL client tools"; \
+		echo "  - Build tools (gcc, make)"; \
+		exit 1; \
+	fi
+
+# Install dependencies and build
+.PHONY: setup
+setup: install-deps build
+
+# Clean and rebuild
+.PHONY: rebuild
+rebuild: clean build
+
 # Development targets
 .PHONY: dev-cli
 dev-cli:
@@ -144,6 +191,11 @@ help:
 	@echo "PostgreSQL Backup Management System"
 	@echo "====================================="
 	@echo ""
+	@echo "Setup targets:"
+	@echo "  install-deps  - Install system dependencies (Linux)"
+	@echo "  setup         - Install deps and build"
+	@echo "  rebuild       - Clean and rebuild"
+	@echo ""
 	@echo "Build targets:"
 	@echo "  build          - Build the release binary"
 	@echo "  clean          - Clean build artifacts"
@@ -167,6 +219,10 @@ help:
 	@echo "  restart-service - Restart systemd service"
 	@echo "  status-service - Check service status"
 	@echo "  logs-service   - View service logs"
+	@echo ""
+	@echo "Troubleshooting:"
+	@echo "  If OpenSSL errors occur, run: make install-deps"
+	@echo "  For clean rebuild: make rebuild"
 	@echo ""
 	@echo "Variables:"
 	@echo "  SERVICE_PORT   - Default REST server port ($(SERVICE_PORT))"

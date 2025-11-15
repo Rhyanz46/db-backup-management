@@ -15,7 +15,7 @@ clap = { version = "4.0", features = ["derive"] }
 inquire = "0.6"
 
 # Database
-tokio-postgres = "0.7"
+tokio-postgres = { version = "0.7", features = ["runtime", "with-uuid-1", "with-chrono-0_4"] }
 postgres = "0.19"
 
 # HTTP server for REST endpoint

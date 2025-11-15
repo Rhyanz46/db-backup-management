@@ -32,14 +32,67 @@ A comprehensive CLI-based PostgreSQL backup management system written in Rust wi
 ### Prerequisites
 - Rust 1.70+ (for building from source)
 - PostgreSQL client tools (`pg_dump`, `psql`) in PATH
+- System dependencies for compilation (Linux only)
 - Optional: Telegram Bot Token for notifications
 
-### Building from Source
+### Quick Start (Linux)
+
+For the easiest setup on Linux, run:
 
 ```bash
 git clone <repository-url>
 cd backup-service
+make setup
+```
+
+This command will:
+1. Install all system dependencies automatically
+2. Build the project with default configuration
+3. Create the binary in `target/release/backup-service`
+
+### Manual Installation
+
+#### 1. Install System Dependencies
+
+**For Ubuntu/Debian:**
+```bash
+sudo apt-get update
+sudo apt-get install -y pkg-config libssl-dev postgresql-client build-essential
+```
+
+**For RHEL/CentOS:**
+```bash
+sudo yum groupinstall -y "Development Tools"
+sudo yum install -y pkgconfig openssl-devel postgresql
+```
+
+**For Fedora:**
+```bash
+sudo dnf groupinstall -y "Development Tools"
+sudo dnf install -y pkgconfig openssl-devel postgresql
+```
+
+**For Arch Linux:**
+```bash
+sudo pacman -S --needed pkgconf openssl postgresql
+```
+
+#### 2. Build the Project
+
+**Option A: Standard build (requires system dependencies):**
+```bash
 make build
+```
+
+**Option B: Using Cargo directly:**
+```bash
+cargo build --release
+```
+
+**If you encounter OpenSSL errors, run:**
+```bash
+make install-deps
+make rebuild
 ```
 
 The compiled binary will be available at `target/release/backup-service`.
