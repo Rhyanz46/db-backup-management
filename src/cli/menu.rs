@@ -350,7 +350,14 @@ impl CliInterface {
             .prompt()
             .context("Failed to get password")?;
 
-        let server_config = ServerConfig::new(name.clone(), host, port, database, username, password);
+        // SSL Mode selection
+        let ssl_choices = vec!["disable", "allow", "prefer", "require"];
+        let ssl_mode = Select::new("SSL/TLS Mode:", ssl_choices)
+            .with_help_message("disable: No SSL, allow: Try SSL, accept no SSL, prefer: Try SSL first, fallback to no SSL, require: Require SSL connection")
+            .prompt()
+            .context("Failed to get SSL mode selection")?;
+
+        let server_config = ServerConfig::new_with_ssl(name.clone(), host, port, database, username, password, ssl_mode.to_string());
 
         // Test connection
         println!("Testing connection...");
@@ -455,13 +462,21 @@ impl CliInterface {
             password
         };
 
-        let new_server_config = ServerConfig::new(
+        // SSL Mode selection
+        let ssl_choices = vec!["disable", "allow", "prefer", "require"];
+        let ssl_mode = Select::new("SSL/TLS Mode:", ssl_choices)
+            .with_help_message("disable: No SSL, allow: Try SSL, accept no SSL, prefer: Try SSL first, fallback to no SSL, require: Require SSL connection")
+            .prompt()
+            .context("Failed to get SSL mode selection")?;
+
+        let new_server_config = ServerConfig::new_with_ssl(
             server.name.clone(),
             host,
             port,
             database,
             username,
             new_password,
+            ssl_mode.to_string(),
         );
 
         // Remove old config and add new one

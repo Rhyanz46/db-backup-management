@@ -17,6 +17,8 @@ inquire = "0.6"
 # Database
 tokio-postgres = { version = "0.7", features = ["runtime", "with-uuid-1", "with-chrono-0_4"] }
 postgres = "0.19"
+postgres-native-tls = "0.5"
+native-tls = "0.2"
 
 # HTTP server for REST endpoint
 axum = "0.7"

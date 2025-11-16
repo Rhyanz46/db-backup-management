@@ -12,6 +12,7 @@ pub struct ServerConfig {
     pub database: String,
     pub username: String,
     pub password: String,
+    pub ssl_mode: String,
     pub version: Option<String>,
     pub total_schemas: Option<usize>,
     pub is_active: bool,
@@ -26,6 +27,22 @@ impl ServerConfig {
             database,
             username,
             password,
+            ssl_mode: "prefer".to_string(), // Default SSL mode
+            version: None,
+            total_schemas: None,
+            is_active: false,
+        }
+    }
+
+    pub fn new_with_ssl(name: String, host: String, port: u16, database: String, username: String, password: String, ssl_mode: String) -> Self {
+        Self {
+            name,
+            host,
+            port,
+            database,
+            username,
+            password,
+            ssl_mode,
             version: None,
             total_schemas: None,
             is_active: false,
@@ -33,8 +50,8 @@ impl ServerConfig {
     }
 
     pub fn connection_string(&self) -> String {
-        format!("postgresql://{}:{}@{}:{}/{}",
-                self.username, self.password, self.host, self.port, self.database)
+        format!("postgresql://{}:{}@{}:{}/{}?sslmode={}",
+                self.username, self.password, self.host, self.port, self.database, self.ssl_mode)
     }
 
     pub fn display_name(&self) -> String {

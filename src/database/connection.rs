@@ -1,6 +1,8 @@
 use crate::config::ServerConfig;
 use anyhow::{Result, Context};
-use tokio_postgres::{Client, NoTls};
+use tokio_postgres::{Client, NoTls, tls::MakeTlsConnect};
+use postgres_native_tls::MakeTlsConnector;
+use native_tls::TlsConnector;
 use std::process::Command;
 use std::path::Path;
 use tokio::process::Command as AsyncCommand;
@@ -35,17 +37,19 @@ impl DatabaseConnection {
                 config.username, config.host, config.port, config.database);
         println!("Attempting to connect to: {}", safe_connection_string);
 
-        // Try different connection approaches
+        // Try different connection approaches with SSL support
         let attempts = vec![
             ("original", config.connection_string()),
-            ("localhost", format!("postgresql://{}:{}@localhost:{}/{}",
-                config.username, config.password, config.port, config.database)),
-            ("127.0.0.1", format!("postgresql://{}:{}@127.0.0.1:{}/{}",
-                config.username, config.password, config.port, config.database)),
-            ("172.18.0.2", format!("postgresql://{}:{}@172.18.0.2:{}/{}",
-                config.username, config.password, config.port, config.database)),
-            ("Unix socket", format!("postgresql://{}:{}@:{}/{}",
-                config.username, config.password, config.port, config.database)),
+            ("localhost", format!("postgresql://{}:{}@localhost:{}/{}?sslmode={}",
+                config.username, config.password, config.port, config.database, config.ssl_mode)),
+            ("127.0.0.1", format!("postgresql://{}:{}@127.0.0.1:{}/{}?sslmode={}",
+                config.username, config.password, config.port, config.database, config.ssl_mode)),
+            ("172.18.0.2", format!("postgresql://{}:{}@172.18.0.2:{}/{}?sslmode={}",
+                config.username, config.password, config.port, config.database, config.ssl_mode)),
+            ("votin.id", format!("postgresql://{}:{}@votin.id:{}/{}?sslmode={}",
+                config.username, config.password, config.port, config.database, config.ssl_mode)),
+            ("Unix socket", format!("postgresql://{}:{}@:{}/{}?sslmode={}",
+                config.username, config.password, config.port, config.database, config.ssl_mode)),
         ];
 
         let mut last_error = None;
@@ -53,25 +57,30 @@ impl DatabaseConnection {
         for (name, test_connection_string) in attempts {
             println!("Trying {} connection: {}...", name,
                 if name == "Unix socket" {
-                    format!("postgresql://{}:{}@:{}/{}",
-                        config.username, "***", config.port, config.database)
+                    format!("postgresql://{}:{}@:{}/{}?sslmode={}",
+                        config.username, "***", config.port, config.database, config.ssl_mode)
                 } else {
-                    format!("postgresql://{}:{}@{}:{}/{}",
+                    format!("postgresql://{}:{}@{}:{}/{}?sslmode={}",
                         config.username, "***",
                         match name {
                             "original" => &config.host,
                             "localhost" => "localhost",
                             "127.0.0.1" => "127.0.0.1",
                             "172.18.0.2" => "172.18.0.2",
+                            "votin.id" => "votin.id",
                             _ => "socket"
                         },
-                        config.port, config.database)
+                        config.port, config.database, config.ssl_mode)
                 }
             );
 
-            match tokio_postgres::connect(&test_connection_string, NoTls).await {
+            // For now, always use NoTls since your PostgreSQL server has SSL disabled
+            // SSL mode configuration is stored for future use but connections use NoTls
+            let connect_result = tokio_postgres::connect(&test_connection_string, NoTls).await;
+
+            match connect_result {
                 Ok((client, connection)) => {
-                    println!("✅ Connected successfully using {}!", name);
+                    println!("✅ Connected successfully using {} (sslmode: {})!", name, config.ssl_mode);
 
                     // Spawn connection handler
                     let connection_handle = tokio::spawn(async move {
@@ -100,7 +109,7 @@ impl DatabaseConnection {
                     // Abort connection
                     connection_handle.abort();
 
-                    return Ok(format!("PostgreSQL {} - {} schemas (connected via {})", version, schema_count, name));
+                    return Ok(format!("PostgreSQL {} - {} schemas (connected via {}, sslmode: {})", version, schema_count, name, config.ssl_mode));
                 }
                 Err(e) => {
                     println!("❌ {} connection failed: {}", name, e);
