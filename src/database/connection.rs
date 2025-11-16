@@ -1,11 +1,9 @@
 use crate::config::ServerConfig;
 use anyhow::{Result, Context};
-use tokio_postgres::{Client, NoTls, tls::MakeTlsConnect};
-use postgres_native_tls::MakeTlsConnector;
-use native_tls::TlsConnector;
+use tokio_postgres::{Client, NoTls};
 use std::process::Command;
 use std::path::Path;
-use tokio::process::Command as AsyncCommand;
+use std::error::Error;
 
 #[derive(Debug)]
 pub struct DatabaseConnection {
@@ -35,7 +33,9 @@ impl DatabaseConnection {
         // Debug: print connection string (without password)
         let safe_connection_string = format!("postgresql://{}:***@{}:{}/{}",
                 config.username, config.host, config.port, config.database);
-        println!("Attempting to connect to: {}", safe_connection_string);
+        println!("🔍 DEBUG: Attempting to connect to: {}", safe_connection_string);
+        println!("🔍 DEBUG: SSL Mode: {}", config.ssl_mode);
+        println!("🔍 DEBUG: Full connection string: {}", connection_string);
 
         // Try different connection approaches with SSL support
         let attempts = vec![
@@ -55,24 +55,8 @@ impl DatabaseConnection {
         let mut last_error = None;
 
         for (name, test_connection_string) in attempts {
-            println!("Trying {} connection: {}...", name,
-                if name == "Unix socket" {
-                    format!("postgresql://{}:{}@:{}/{}?sslmode={}",
-                        config.username, "***", config.port, config.database, config.ssl_mode)
-                } else {
-                    format!("postgresql://{}:{}@{}:{}/{}?sslmode={}",
-                        config.username, "***",
-                        match name {
-                            "original" => &config.host,
-                            "localhost" => "localhost",
-                            "127.0.0.1" => "127.0.0.1",
-                            "172.18.0.2" => "172.18.0.2",
-                            "votin.id" => "votin.id",
-                            _ => "socket"
-                        },
-                        config.port, config.database, config.ssl_mode)
-                }
-            );
+            println!("🔍 DEBUG: Trying {} connection...", name);
+            println!("🔍 DEBUG: Connection string: {}", test_connection_string);
 
             // For now, always use NoTls since your PostgreSQL server has SSL disabled
             // SSL mode configuration is stored for future use but connections use NoTls
@@ -113,6 +97,11 @@ impl DatabaseConnection {
                 }
                 Err(e) => {
                     println!("❌ {} connection failed: {}", name, e);
+                    println!("🔬 DEBUG: Error details for {}:", name);
+                    if let Some(source) = e.source() {
+                        println!("   Source: {}", source);
+                    }
+                    println!("   Error type: {}", std::any::type_name::<tokio_postgres::Error>());
                     last_error = Some(e);
                 }
             }

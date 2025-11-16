@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Your Name <your.email@example.com>"]
 description = "PostgreSQL backup management system with CLI interface"
+rust-version = "1.70"
+
+# Optimized for rust-analyzer
+[workspace.metadata.rust-analyzer]
+rustc.private = ["proc_macro"]
 
 [[bin]]
 name = "backup-service"

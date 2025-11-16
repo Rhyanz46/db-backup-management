@@ -72,6 +72,36 @@ enum Commands {
         /// Server name (optional, defaults to active server)
         server: Option<String>,
     },
+    /// Debug PostgreSQL connection with custom parameters
+    Debug {
+        /// Host/IP address for testing connection
+        #[arg(long)]
+        host: Option<String>,
+
+        /// Port for PostgreSQL
+        #[arg(long, short = 'P', default_value = "5432")]
+        port: u16,
+
+        /// Database name
+        #[arg(long, short = 'D')]
+        database: Option<String>,
+
+        /// Username
+        #[arg(long, short = 'U')]
+        username: Option<String>,
+
+        /// Password
+        #[arg(long, short = 'W')]
+        password: Option<String>,
+
+        /// SSL mode (disable, allow, prefer, require)
+        #[arg(long, default_value = "disable")]
+        ssl_mode: String,
+
+        /// Test multiple hosts automatically
+        #[arg(long)]
+        test_all_hosts: bool,
+    },
 }
 
 
@@ -124,6 +154,10 @@ async fn main() -> Result<()> {
         Commands::Test { server } => {
             info!("Testing server connection");
             test_server_connection(&cli.config_dir, server).await?;
+        }
+        Commands::Debug { host, port, database, username, password, ssl_mode, test_all_hosts } => {
+            info!("Debug mode: Testing PostgreSQL connection");
+            debug_connection(host, port, database, username, password, ssl_mode, test_all_hosts).await?;
         }
     }
 
@@ -394,6 +428,115 @@ async fn test_server_connection(config_dir: &str, server_name: Option<String>) -
             }
         }
     }
+
+    Ok(())
+}
+
+async fn debug_connection(
+    host: Option<String>,
+    port: u16,
+    database: Option<String>,
+    username: Option<String>,
+    password: Option<String>,
+    ssl_mode: String,
+    test_all_hosts: bool,
+) -> Result<()> {
+    use crate::config::ServerConfig;
+
+    println!("🔍 PostgreSQL Connection Debug Mode");
+    println!("==================================");
+    println!();
+
+    // Default values if not provided
+    let host = host.unwrap_or_else(|| "votin.id".to_string());
+    let database = database.unwrap_or_else(|| "suara_rakyat".to_string());
+    let username = username.unwrap_or_else(|| "suararakyat".to_string());
+    let password = password.unwrap_or_else(|| "P@ssw0rd".to_string());
+
+    println!("Connection Parameters:");
+    println!("  Host: {}", host);
+    println!("  Port: {}", port);
+    println!("  Database: {}", database);
+    println!("  Username: {}", username);
+    println!("  Password: ***");
+    println!("  SSL Mode: {}", ssl_mode);
+    println!();
+
+    let server_config = ServerConfig::new_with_ssl(
+        "debug".to_string(),
+        host.clone(),
+        port,
+        database.clone(),
+        username.clone(),
+        password.clone(),
+        ssl_mode.clone(),
+    );
+
+    if test_all_hosts {
+        println!("🔄 Testing multiple hosts...");
+        let hosts_to_test = vec![
+            ("original", host.clone()),
+            ("localhost", "localhost".to_string()),
+            ("127.0.0.1", "127.0.0.1".to_string()),
+            ("172.18.0.2", "172.18.0.2".to_string()),
+            ("votin.id", "votin.id".to_string()),
+        ];
+
+        for (name, test_host) in hosts_to_test {
+            println!();
+            println!("📡 Testing {} ({})...", name, test_host);
+
+            let test_config = ServerConfig::new_with_ssl(
+                format!("debug_{}", name),
+                test_host.clone(),
+                port,
+                database.clone(),
+                username.clone(),
+                password.clone(),
+                ssl_mode.clone(),
+            );
+
+            match crate::database::DatabaseConnection::test_connection(&test_config).await {
+                Ok(info) => {
+                    println!("✅ SUCCESS: {}", info);
+                    break; // Stop at first successful connection
+                }
+                Err(e) => {
+                    println!("❌ FAILED: {}", e);
+                    if let Some(source) = e.source() {
+                        println!("   Details: {}", source);
+                    }
+                }
+            }
+        }
+    } else {
+        println!("📡 Testing single connection...");
+        match crate::database::DatabaseConnection::test_connection(&server_config).await {
+            Ok(info) => {
+                println!("✅ SUCCESS: {}", info);
+            }
+            Err(e) => {
+                println!("❌ FAILED: {}", e);
+                if let Some(source) = e.source() {
+                    println!("   Details: {}", source);
+                }
+
+                // Suggest alternative hosts
+                println!();
+                println!("💡 Suggestions:");
+                println!("  Try --test-all-hosts to test multiple hosts");
+                println!("  Try --host 172.18.0.2 (actual PostgreSQL IP)");
+                println!("  Try --host localhost");
+                println!("  Try --ssl-mode disable (current: {})", ssl_mode);
+            }
+        }
+    }
+
+    println!();
+    println!("🐛 Debug command examples:");
+    println!("  ./target/debug/backup-service debug --host votin.id --test-all-hosts");
+    println!("  ./target/debug/backup-service debug --host 172.18.0.2 --ssl-mode disable");
+    println!("  ./target/debug/backup-service debug --host localhost --username suararakyat --password 'P@ssw0rd'");
 
     Ok(())
 }
