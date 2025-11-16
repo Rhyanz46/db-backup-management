@@ -15,7 +15,7 @@ impl DatabaseConnection {
         let connection_string = config.connection_string();
         let (client, connection) = tokio_postgres::connect(&connection_string, NoTls)
             .await
-            .context("Failed to connect to PostgreSQL server")?;
+            .with_context(|| format!("Failed to connect to PostgreSQL server at {}:{}", config.host, config.port))?;
 
         // The connection object needs to be polled to handle database operations
         tokio::spawn(async move {
@@ -29,38 +29,88 @@ impl DatabaseConnection {
 
     pub async fn test_connection(config: &ServerConfig) -> Result<String> {
         let connection_string = config.connection_string();
-        let (client, connection) = tokio_postgres::connect(&connection_string, NoTls)
-            .await
-            .context("Failed to connect to PostgreSQL server")?;
 
-        // Spawn connection handler
-        let connection_handle = tokio::spawn(async move {
-            if let Err(e) = connection.await {
-                log::error!("Database connection error: {}", e);
+        // Debug: print connection string (without password)
+        let safe_connection_string = format!("postgresql://{}:***@{}:{}/{}",
+                config.username, config.host, config.port, config.database);
+        println!("Attempting to connect to: {}", safe_connection_string);
+
+        // Try different connection approaches
+        let attempts = vec![
+            ("original", config.connection_string()),
+            ("localhost", format!("postgresql://{}:{}@localhost:{}/{}",
+                config.username, config.password, config.port, config.database)),
+            ("127.0.0.1", format!("postgresql://{}:{}@127.0.0.1:{}/{}",
+                config.username, config.password, config.port, config.database)),
+            ("172.18.0.2", format!("postgresql://{}:{}@172.18.0.2:{}/{}",
+                config.username, config.password, config.port, config.database)),
+            ("Unix socket", format!("postgresql://{}:{}@:{}/{}",
+                config.username, config.password, config.port, config.database)),
+        ];
+
+        let mut last_error = None;
+
+        for (name, test_connection_string) in attempts {
+            println!("Trying {} connection: {}...", name,
+                if name == "Unix socket" {
+                    format!("postgresql://{}:{}@:{}/{}",
+                        config.username, "***", config.port, config.database)
+                } else {
+                    format!("postgresql://{}:{}@{}:{}/{}",
+                        config.username, "***",
+                        match name {
+                            "original" => &config.host,
+                            "localhost" => "localhost",
+                            "127.0.0.1" => "127.0.0.1",
+                            "172.18.0.2" => "172.18.0.2",
+                            _ => "socket"
+                        },
+                        config.port, config.database)
+                }
+            );
+
+            match tokio_postgres::connect(&test_connection_string, NoTls).await {
+                Ok((client, connection)) => {
+                    println!("✅ Connected successfully using {}!", name);
+
+                    // Spawn connection handler
+                    let connection_handle = tokio::spawn(async move {
+                        if let Err(e) = connection.await {
+                            log::error!("Database connection error: {}", e);
+                        }
+                    });
+
+                    // Get server version
+                    let row = client.query_one("SELECT version()", &[])
+                        .await
+                        .context("Failed to query server version")?;
+
+                    let version: String = row.get(0);
+
+                    // Get count of schemas
+                    let schemas_row = client.query_one(
+                        "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name NOT IN ('information_schema', 'pg_catalog', 'pg_toast')",
+                        &[]
+                    )
+                        .await
+                        .context("Failed to count schemas")?;
+
+                    let schema_count: i64 = schemas_row.get(0);
+
+                    // Abort connection
+                    connection_handle.abort();
+
+                    return Ok(format!("PostgreSQL {} - {} schemas (connected via {})", version, schema_count, name));
+                }
+                Err(e) => {
+                    println!("❌ {} connection failed: {}", name, e);
+                    last_error = Some(e);
+                }
             }
-        });
+        }
 
-        // Get server version
-        let row = client.query_one("SELECT version()", &[])
-            .await
-            .context("Failed to query server version")?;
-
-        let version: String = row.get(0);
-
-        // Get count of schemas
-        let schemas_row = client.query_one(
-            "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name NOT IN ('information_schema', 'pg_catalog', 'pg_toast')",
-            &[]
-        )
-            .await
-            .context("Failed to count schemas")?;
-
-        let schema_count: i64 = schemas_row.get(0);
-
-        // Abort connection
-        connection_handle.abort();
-
-        Ok(format!("PostgreSQL {} - {} schemas", version, schema_count))
+        Err(last_error.map(|e| anyhow::anyhow!("Failed to connect to PostgreSQL server using any method: {}", e))
+            .unwrap_or_else(|| anyhow::anyhow!("Failed to connect to PostgreSQL server")))
     }
 
     pub async fn get_schemas(&self) -> Result<Vec<String>> {
