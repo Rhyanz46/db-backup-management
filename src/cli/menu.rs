@@ -5,23 +5,19 @@ use crate::notifications::TelegramNotifier;
 use anyhow::{Result, Context};
 use inquire::{Select, Text, Confirm, MultiSelect, CustomType};
 use std::path::Path;
-use tokio::runtime::Runtime;
-
 pub struct CliInterface {
     server_manager: ServerManager,
     backup_manager: BackupManager,
     telegram_manager: TelegramManager,
-    runtime: Runtime,
 }
 
 impl CliInterface {
-    pub fn new(config_dir: &str, backup_dir: &str) -> Result<Self> {
-        Ok(Self {
+    pub fn new(config_dir: &str, backup_dir: &str) -> Self {
+        Self {
             server_manager: ServerManager::new(config_dir),
             backup_manager: BackupManager::new(backup_dir),
             telegram_manager: TelegramManager::new(config_dir),
-            runtime: Runtime::new().context("Failed to create tokio runtime")?,
-        })
+        }
     }
 
     pub async fn run(&mut self) -> Result<()> {
@@ -76,11 +72,11 @@ impl CliInterface {
 
         // Test connection and get schemas
         println!("Connecting to database to get available schemas...");
-        let connection_info = self.runtime.block_on(DatabaseConnection::test_connection(active_server))?;
+        let connection_info = DatabaseConnection::test_connection(active_server).await?;
         println!("Connection successful: {}", connection_info);
 
-        let connection = self.runtime.block_on(DatabaseConnection::connect(active_server))?;
-        let schemas = self.runtime.block_on(connection.get_schemas())?;
+        let connection = DatabaseConnection::connect(active_server).await?;
+        let schemas = connection.get_schemas().await?;
 
         if schemas.is_empty() {
             println!("No schemas found to backup.");
@@ -115,23 +111,19 @@ impl CliInterface {
         let timestamp = self.backup_manager.generate_timestamp_filename();
         let backup_file = self.backup_manager.get_backup_filepath(&timestamp);
 
-        self.runtime.block_on(
-            DatabaseConnection::backup_schemas(active_server, &selected_schemas, backup_file.to_str().unwrap())
-        )?;
+        DatabaseConnection::backup_schemas(active_server, &selected_schemas, backup_file.to_str().unwrap()).await?;
 
         println!("✅ Backup created successfully: {}", backup_file.display());
 
         // Send notification if configured
         if self.telegram_manager.is_enabled() {
             if let Ok(notifier) = TelegramNotifier::new(self.telegram_manager.get_config().unwrap()) {
-                let _ = self.runtime.block_on(
-                    notifier.send_backup_notification(
-                        active_server,
-                        &selected_schemas,
-                        &timestamp,
-                        &self.backup_manager.get_backup_info(&backup_file)?.size_display()
-                    )
-                );
+                let _ = notifier.send_backup_notification(
+                    active_server,
+                    &selected_schemas,
+                    &timestamp,
+                    &self.backup_manager.get_backup_info(&backup_file)?.size_display()
+                ).await;
             }
         }
 
@@ -256,23 +248,19 @@ impl CliInterface {
         }
 
         println!("Restoring backup...");
-        self.runtime.block_on(
-            DatabaseConnection::restore_backup(server, backup.filepath.to_str().unwrap())
-        )?;
+        DatabaseConnection::restore_backup(server, backup.filepath.to_str().unwrap()).await?;
 
         println!("✅ Backup restored successfully.");
 
         // Send notification if configured
         if self.telegram_manager.is_enabled() {
             if let Ok(notifier) = TelegramNotifier::new(self.telegram_manager.get_config().unwrap()) {
-                let _ = self.runtime.block_on(
-                    notifier.send_restore_notification(
-                        server,
-                        &backup.schemas,
-                        &backup.filename,
-                        &backup.size_display()
-                    )
-                );
+                let _ = notifier.send_restore_notification(
+                    server,
+                    &backup.schemas,
+                    &backup.filename,
+                    &backup.size_display()
+                ).await;
             }
         }
 
@@ -366,14 +354,12 @@ impl CliInterface {
 
         // Test connection
         println!("Testing connection...");
-        match self.runtime.block_on(DatabaseConnection::test_connection(&server_config)) {
+        match DatabaseConnection::test_connection(&server_config).await {
             Ok(connection_info) => {
                 println!("✅ Connection successful: {}", connection_info);
 
                 // Get server version and schema count
-                let version = self.runtime.block_on(
-                    DatabaseConnection::get_server_version(&server_config)
-                )?;
+                let version = DatabaseConnection::get_server_version(&server_config).await?;
 
                 // Add server
                 self.server_manager.add_server(server_config)?;
@@ -516,15 +502,13 @@ impl CliInterface {
         println!("Testing connection to {}...", server.name);
         let server_name = server.name.clone();
 
-        match self.runtime.block_on(DatabaseConnection::test_connection(server)) {
+        match DatabaseConnection::test_connection(server).await {
             Ok(connection_info) => {
                 println!("✅ Connection successful: {}", connection_info);
 
                 // Update server info
                 if let Some(server) = self.server_manager.get_server_mut(&server_name) {
-                    let version = self.runtime.block_on(
-                        DatabaseConnection::get_server_version(server)
-                    )?;
+                    let version = DatabaseConnection::get_server_version(server).await?;
                     server.version = Some(version);
                     self.server_manager.save()?;
                 }

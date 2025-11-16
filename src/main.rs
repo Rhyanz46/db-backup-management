@@ -89,7 +89,7 @@ async fn main() -> Result<()> {
     match cli.command {
         Commands::Run => {
             info!("Starting interactive CLI mode");
-            let mut cli_interface = CliInterface::new(&cli.config_dir, &cli.backup_dir)?;
+            let mut cli_interface = CliInterface::new(&cli.config_dir, &cli.backup_dir);
             cli_interface.run().await?;
         }
         Commands::Server => {
@@ -296,7 +296,7 @@ async fn restore_backup(config_dir: &str, backup_dir: &str, filename: &str, targ
 }
 
 async fn manage_servers(config_dir: &str) -> Result<()> {
-    let mut cli_interface = CliInterface::new(config_dir, &format!("{}/backup", std::env::current_dir()?.to_string_lossy()))?;
+    let mut cli_interface = CliInterface::new(config_dir, &format!("{}/backup", std::env::current_dir()?.to_string_lossy()));
     cli_interface.manage_servers().await
 }
 
