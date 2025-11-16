@@ -1,0 +1,35 @@
+{
+  "production_db": {
+    "name": "production_db",
+    "host": "localhost",
+    "port": 5432,
+    "database": "production_app",
+    "username": "backup_user",
+    "password": "secure_password_here",
+    "version": null,
+    "total_schemas": null,
+    "is_active": true
+  },
+  "staging_db": {
+    "name": "staging_db",
+    "host": "staging.example.com",
+    "port": 5432,
+    "database": "staging_app",
+    "username": "backup_user",
+    "password": "staging_password_here",
+    "version": null,
+    "total_schemas": null,
+    "is_active": false
+  },
+  "development_db": {
+    "name": "development_db",
+    "host": "localhost",
+    "port": 5433,
+    "database": "dev_app",
+    "username": "postgres",
+    "password": "dev_password",
+    "version": null,
+    "total_schemas": null,
+    "is_active": false
+  }
+}

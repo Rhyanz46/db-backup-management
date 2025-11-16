@@ -1,0 +1,43 @@
+[Unit]
+Description=PostgreSQL Backup Management Service
+Documentation=https://github.com/your-repo/backup-service
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=backup-service
+Group=backup-service
+WorkingDirectory=/opt/backup-service
+Environment="RUST_LOG=info"
+Environment="RUST_BACKTRACE=1"
+
+# Main executable command with port configuration
+ExecStart=/opt/backup-service/bin/backup-service server \
+  --config-dir /opt/backup-service/config \
+  --backup-dir /opt/backup-service/backup \
+  --port 8080
+
+# Restart configuration
+Restart=always
+RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=3
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/backup-service/config /opt/backup-service/backup /opt/backup-service/logs
+
+# Resource limits
+LimitNOFILE=65536
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=backup-service
+
+[Install]
+WantedBy=multi-user.target

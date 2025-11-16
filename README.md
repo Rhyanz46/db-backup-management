@@ -91,7 +91,19 @@ cargo build --release
 
 **If you encounter OpenSSL errors, run:**
 ```bash
-make install-deps
+# For Ubuntu/Debian:
+sudo apt-get update
+sudo apt-get install -y pkg-config libssl-dev postgresql-client build-essential
+
+# For RHEL/CentOS:
+sudo yum groupinstall -y "Development Tools"
+sudo yum install -y pkgconfig openssl-devel postgresql
+
+# For Fedora:
+sudo dnf groupinstall -y "Development Tools"
+sudo dnf install -y pkgconfig openssl-devel postgresql
+
+# After installing dependencies:
 make rebuild
 ```
 
