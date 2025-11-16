@@ -12,10 +12,15 @@ pub struct ServerConfig {
     pub database: String,
     pub username: String,
     pub password: String,
+    #[serde(default = "default_ssl_mode")]
     pub ssl_mode: String,
     pub version: Option<String>,
     pub total_schemas: Option<usize>,
     pub is_active: bool,
+}
+
+fn default_ssl_mode() -> String {
+    "prefer".to_string()
 }
 
 impl ServerConfig {
