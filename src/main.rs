@@ -23,12 +23,12 @@ struct Cli {
     #[command(subcommand)]
     command: Commands,
 
-    /// Config directory path (default: ./config)
-    #[arg(long, default_value = "./config")]
+    /// Config directory path (default: /etc/backup-service/config)
+    #[arg(long, default_value = "/etc/backup-service/config")]
     config_dir: String,
 
-    /// Backup directory path (default: ./backup)
-    #[arg(long, default_value = "./backup")]
+    /// Backup directory path (default: /etc/backup-service/backup)
+    #[arg(long, default_value = "/etc/backup-service/backup")]
     backup_dir: String,
 
     /// Port for REST API server (default: 8080)
@@ -331,7 +331,8 @@ async fn restore_backup(config_dir: &str, backup_dir: &str, filename: &str, targ
 }
 
 async fn manage_servers(config_dir: &str) -> Result<()> {
-    let mut cli_interface = CliInterface::new(config_dir, &format!("{}/backup", std::env::current_dir()?.to_string_lossy()));
+    let backup_dir = "/etc/backup-service/backup"; // Use default backup path
+    let mut cli_interface = CliInterface::new(config_dir, backup_dir);
     cli_interface.manage_servers().await
 }
 

@@ -8,7 +8,7 @@ Wants=postgresql.service
 Type=simple
 User={{SERVICE_USER}}
 Group={{SERVICE_USER}}
-WorkingDirectory=/var/lib/backup-service
+WorkingDirectory=/etc/backup-service
 Environment="RUST_LOG=info"
 Environment="RUST_BACKTRACE=1"
 
