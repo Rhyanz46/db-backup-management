@@ -29,7 +29,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths={{CONFIG_DIR}} {{BACKUP_DIR}}
+ReadWritePaths={{CONFIG_DIR}} {{BACKUP_DIR}} /var/log/backup-service
 
 # Resource limits
 LimitNOFILE=65536

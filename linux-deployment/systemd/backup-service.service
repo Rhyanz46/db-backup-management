@@ -8,14 +8,14 @@ Wants=postgresql.service
 Type=simple
 User=backup-service
 Group=backup-service
-WorkingDirectory=/opt/backup-service
+WorkingDirectory=/etc/backup-service
 Environment="RUST_LOG=info"
 Environment="RUST_BACKTRACE=1"
 
 # Main executable command with port configuration
-ExecStart=/opt/backup-service/bin/backup-service server \
-  --config-dir /opt/backup-service/config \
-  --backup-dir /opt/backup-service/backup \
+ExecStart=/usr/local/bin/backup-service server \
+  --config-dir /etc/backup-service/config \
+  --backup-dir /etc/backup-service/backup \
   --port 8080
 
 # Restart configuration
@@ -29,7 +29,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/backup-service/config /opt/backup-service/backup /opt/backup-service/logs
+ReadWritePaths=/etc/backup-service/config /etc/backup-service/backup /var/log/backup-service
 
 # Resource limits
 LimitNOFILE=65536
