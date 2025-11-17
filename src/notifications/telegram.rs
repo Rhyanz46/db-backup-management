@@ -2,6 +2,7 @@ use crate::config::TelegramConfig;
 use anyhow::{Result, Context};
 use teloxide::prelude::*;
 use teloxide::types::ParseMode;
+use chrono;
 
 pub struct TelegramNotifier {
     bot: Bot,
@@ -124,6 +125,158 @@ impl TelegramNotifier {
                 chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
             )
         };
+
+        self.send_message(&message).await
+    }
+
+    pub async fn send_cronjob_success_notification(
+        &self,
+        job_name: &str,
+        job_schedule: &str,
+        backup_filename: &str,
+        backup_size: &str,
+        duration_seconds: u64,
+        schemas: &[String],
+    ) -> Result<()> {
+        let message = format!(
+            "⏰ *Cronjob Executed Successfully*\n\n\
+            *Job Name:* {}\n\
+            *Schedule:* {}\n\
+            *Duration:* {}m {}s\n\
+            *Backup File:* `{}`\n\
+            *Size:* {}\n\
+            *Schemas:* {}\n\
+            {}\n\n\
+            *Status:* ✅ Completed\n\
+            *Timestamp:* {}",
+            job_name,
+            job_schedule,
+            duration_seconds / 60,
+            duration_seconds % 60,
+            backup_filename,
+            backup_size,
+            schemas.len(),
+            if schemas.len() <= 10 {
+                schemas.iter().enumerate().map(|(i, s)|
+                    if i < 10 { format!("• {}", s) } else { String::new() }
+                ).filter(|s| !s.is_empty()).collect::<Vec<_>>().join("\n")
+            } else {
+                format!("• {} schemas (first 10 shown)",
+                    schemas.iter().take(10).collect::<Vec<_>>().join(", "))
+            },
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
+        );
+
+        self.send_message(&message).await
+    }
+
+    pub async fn send_cronjob_failure_notification(
+        &self,
+        job_name: &str,
+        job_schedule: &str,
+        error_message: &str,
+        retry_count: u32,
+        next_retry: Option<chrono::DateTime<chrono::Local>>,
+    ) -> Result<()> {
+        let retry_info = if retry_count > 0 {
+            if let Some(next_time) = next_retry {
+                format!("\n*Retry Count:* {}\n*Next Retry:* {}", retry_count, next_time.format("%Y-%m-%d %H:%M:%S"))
+            } else {
+                format!("\n*Retry Count:* {}\n*Next Retry:* Not scheduled", retry_count)
+            }
+        } else {
+            String::new()
+        };
+
+        let message = format!(
+            "🚨 *Cronjob Execution Failed*\n\n\
+            *Job Name:* {}\n\
+            *Schedule:* {}\n\
+            *Error:* `{}`{}\n\
+            *Status:* ❌ Failed\n\
+            *Timestamp:* {}",
+            job_name,
+            job_schedule,
+            error_message,
+            retry_info,
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
+        );
+
+        self.send_message(&message).await
+    }
+
+    pub async fn send_cronjob_schedule_notification(
+        &self,
+        job_name: &str,
+        job_schedule: &str,
+        next_run: Option<chrono::DateTime<chrono::Local>>,
+    ) -> Result<()> {
+        let next_run_info = if let Some(next_time) = next_run {
+            format!("*Next Run:* {}", next_time.format("%Y-%m-%d %H:%M:%S"))
+        } else {
+            String::from("*Next Run:* Not scheduled")
+        };
+
+        let message = format!(
+            "📅 *Cronjob Scheduled*\n\n\
+            *Job Name:* {}\n\
+            *Schedule:* {}\n\
+            {}\n\n\
+            *Status:* ⏰ Active\n\
+            *Created:* {}",
+            job_name,
+            job_schedule,
+            next_run_info,
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
+        );
+
+        self.send_message(&message).await
+    }
+
+    pub async fn send_cronjob_removed_notification(
+        &self,
+        job_name: &str,
+        job_schedule: &str,
+    ) -> Result<()> {
+        let message = format!(
+            "🗑️ *Cronjob Removed*\n\n\
+            *Job Name:* {}\n\
+            *Schedule:* {}\n\n\
+            *Status:* ⛔ Removed\n\
+            *Timestamp:* {}",
+            job_name,
+            job_schedule,
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
+        );
+
+        self.send_message(&message).await
+    }
+
+    pub async fn send_cronjob_statistics_notification(
+        &self,
+        total_jobs: usize,
+        enabled_jobs: usize,
+        total_executions: u64,
+        success_rate: f64,
+        period: &str,
+    ) -> Result<()> {
+        let message = format!(
+            "📊 *Cronjob Statistics Report*\n\n\
+            *Period:* {}\n\
+            *Total Jobs:* {}\n\
+            *Enabled Jobs:* {}\n\
+            *Disabled Jobs:* {}\n\n\
+            *Total Executions:* {}\n\
+            *Success Rate:* {:.1}%\n\n\
+            *Report Generated:* {}",
+            period,
+            total_jobs,
+            enabled_jobs,
+            total_jobs - enabled_jobs,
+            total_executions,
+            success_rate,
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
+        );
 
         self.send_message(&message).await
     }

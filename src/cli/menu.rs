@@ -2,6 +2,7 @@ use crate::config::{ServerManager, ServerConfig, TelegramManager};
 use crate::database::DatabaseConnection;
 use crate::backup::{BackupManager, BackupInfo};
 use crate::notifications::TelegramNotifier;
+use crate::cronjob::CronJobCli;
 use anyhow::{Result, Context};
 use inquire::{Select, Text, Confirm, MultiSelect, CustomType};
 use std::path::Path;
@@ -9,6 +10,7 @@ pub struct CliInterface {
     server_manager: ServerManager,
     backup_manager: BackupManager,
     telegram_manager: TelegramManager,
+    config_dir: String,
 }
 
 impl CliInterface {
@@ -17,6 +19,7 @@ impl CliInterface {
             server_manager: ServerManager::new(config_dir),
             backup_manager: BackupManager::new(backup_dir),
             telegram_manager: TelegramManager::new(config_dir),
+            config_dir: config_dir.to_string(),
         }
     }
 
@@ -36,6 +39,7 @@ impl CliInterface {
                 "C. Backup Details",
                 "D. Manage Servers",
                 "E. Notification Settings",
+                "F. Schedule Jobs",
                 "Q. Quit",
             ];
 
@@ -49,6 +53,7 @@ impl CliInterface {
                 "C. Backup Details" => self.backup_details().await?,
                 "D. Manage Servers" => self.manage_servers().await?,
                 "E. Notification Settings" => self.notification_settings()?,
+                "F. Schedule Jobs" => self.schedule_jobs().await?,
                 "Q. Quit" => {
                     println!("Goodbye! 👋");
                     break;
@@ -633,6 +638,16 @@ impl CliInterface {
         self.telegram_manager.set_config(config)?;
 
         println!("✅ Telegram notifications configured successfully.");
+
+        Ok(())
+    }
+
+    async fn schedule_jobs(&self) -> Result<()> {
+        println!("\n📅 Cronjob Management");
+        println!("======================");
+
+        let cronjob_cli = CronJobCli::new(&self.config_dir);
+        cronjob_cli.run_interactive_menu().await?;
 
         Ok(())
     }

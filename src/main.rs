@@ -10,10 +10,12 @@ mod backup;
 mod cli;
 mod api;
 mod notifications;
+mod cronjob;
 
 use cli::CliInterface;
 use config::{ServerManager, TelegramManager};
 use database::DatabaseConnection;
+use cronjob::{CronJobCli, CronScheduler};
 
 #[derive(Parser)]
 #[command(name = "backup-service")]
@@ -102,6 +104,8 @@ enum Commands {
         #[arg(long)]
         test_all_hosts: bool,
     },
+    /// Manage cronjob schedules
+    Cronjob,
 }
 
 
@@ -158,6 +162,11 @@ async fn main() -> Result<()> {
         Commands::Debug { host, port, database, username, password, ssl_mode, test_all_hosts } => {
             info!("Debug mode: Testing PostgreSQL connection");
             debug_connection(host, port, database, username, password, ssl_mode, test_all_hosts).await?;
+        }
+        Commands::Cronjob => {
+            info!("Starting cronjob management");
+            let cronjob_cli = CronJobCli::new(&cli.config_dir);
+            cronjob_cli.run_interactive_menu().await?;
         }
     }
 

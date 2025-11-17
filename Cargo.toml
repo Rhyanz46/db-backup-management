@@ -55,6 +55,12 @@ teloxide = { version = "0.12", features = ["macros"], optional = true }
 # Async runtime
 futures = "0.3"
 
+# Cronjob scheduling
+tokio-cron-scheduler = "0.10"
+
+# UUID for generating job IDs
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
 
 [features]
 default = ["telegram"]

@@ -9,6 +9,7 @@ use chrono::{Local, Utc};
 use crate::config::{ServerManager, TelegramManager};
 use crate::database::DatabaseConnection;
 use crate::backup::BackupManager;
+use crate::cronjob::CronScheduler;
 
 #[derive(Serialize)]
 pub struct BackupResponse {
@@ -35,6 +36,33 @@ pub struct AppState {
 }
 
 pub async fn start_rest_server(config_dir: &str, backup_dir: &str, port: u16) -> Result<()> {
+    // Initialize and start cronjob scheduler in background
+    let config_dir_clone = config_dir.to_string();
+    let backup_dir_clone = backup_dir.to_string();
+
+    let scheduler_handle = tokio::spawn(async move {
+        println!("⏰ Starting cronjob scheduler...");
+
+        let mut scheduler = CronScheduler::new(&config_dir_clone, &backup_dir_clone);
+        if let Err(e) = scheduler.initialize().await {
+            eprintln!("❌ Failed to initialize cronjob scheduler: {}", e);
+            return;
+        }
+
+        if let Err(e) = scheduler.start().await {
+            eprintln!("❌ Failed to start cronjob scheduler: {}", e);
+            return;
+        }
+
+        println!("✅ Cronjob scheduler started successfully");
+
+        // Keep scheduler running
+        if let Err(e) = scheduler.run_forever().await {
+            eprintln!("❌ Cronjob scheduler error: {}", e);
+        }
+    });
+
+    // Start REST API server
     let app_state = AppState {
         config_dir: Arc::new(config_dir.to_string()),
         backup_dir: Arc::new(backup_dir.to_string()),
@@ -51,13 +79,25 @@ pub async fn start_rest_server(config_dir: &str, backup_dir: &str, port: u16) ->
     let listener = TcpListener::bind(&addr).await?;
 
     println!("🚀 REST API Server started on {}", listener.local_addr()?);
+    println!("⏰ Cronjob scheduler running in background");
     println!("📡 Available endpoints:");
     println!("   GET  /health - Health check");
     println!("   POST /backup - Trigger backup");
     println!("   GET  /backup - List backups");
+    println!("");
+    println!("💡 Cronjob configuration:");
+    println!("   CLI: ./backup-service cronjob");
+    println!("   Or: ./backup-service run → F. Schedule Jobs");
 
-    axum::serve(listener, app).await
-        .context("Failed to start REST server")?;
+    // Run both REST API and monitor scheduler
+    tokio::select! {
+        result = axum::serve(listener, app) => {
+            result.context("Failed to start REST server")?;
+        }
+        _ = scheduler_handle => {
+            eprintln!("⚠️  Cronjob scheduler stopped unexpectedly");
+        }
+    }
 
     Ok(())
 }
