@@ -379,7 +379,7 @@ impl CronJobManager {
 
             if !valid_patterns.iter().any(|&pattern| part.starts_with(pattern)) &&
                !part.contains('-') && // Allow ranges like 1-5
-               part != "?" {  // Allow question marks
+               part.as_str() != "?" {  // Allow question marks
                 return false;
             }
         }

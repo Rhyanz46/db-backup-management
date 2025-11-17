@@ -48,7 +48,7 @@ impl CronScheduler {
             // Add all enabled jobs to scheduler
             let jobs = {
                 let manager = self.job_manager.read().await;
-                manager.list_enabled_jobs().to_vec()
+                manager.list_enabled_jobs().clone()
             };
 
             let jobs_count = jobs.len();
@@ -90,10 +90,9 @@ impl CronScheduler {
                 let result = execute_cronjob(&job_id, &config_dir, &backup_dir).await;
 
                 // Update job statistics based on execution result
-                if let Ok(mut manager) = job_manager.write().await {
-                    if let Err(e) = manager.update_job_stats(&job_id, result.is_ok()) {
-                        error!("Failed to update job stats: {}", e);
-                    }
+                let mut manager = job_manager.write().await;
+                if let Err(e) = manager.update_job_stats(&job_id, result.is_ok()) {
+                    error!("Failed to update job stats: {}", e);
                 }
 
                 match result {
@@ -128,7 +127,7 @@ impl CronScheduler {
     }
 
     pub async fn stop(&mut self) -> Result<()> {
-        if let Some(scheduler) = &self.scheduler {
+        if let Some(scheduler) = self.scheduler.take() {
             scheduler.shutdown().await
                 .context("Failed to shutdown scheduler")?;
             info!("Cronjob scheduler stopped");
@@ -146,7 +145,7 @@ impl CronScheduler {
             tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
 
             // Periodically check if scheduler is still running
-            if let Some(scheduler) = &self.scheduler {
+            if self.scheduler.is_some() {
                 // Simple health check - if scheduler is not running, try to restart it
                 // This is a simplified approach - in production you'd want better monitoring
                 debug!("Scheduler health check - running normally");
