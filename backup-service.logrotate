@@ -1,0 +1,19 @@
+# Logrotate configuration for PostgreSQL Backup Service
+# Place this file in /etc/logrotate.d/backup-service
+
+/var/log/backup-service/*.log {
+    daily
+    missingok
+    rotate 30
+    compress
+    delaycompress
+    notifempty
+    create 644 backup-service backup-service
+    postrotate
+        # Send USR1 signal to the service to reopen log files
+        /bin/systemctl reload backup-service > /dev/null 2>&1 || true
+    endscript
+}
+
+# Also rotate journald logs for the service (optional)
+# This requires manual configuration in journald.conf or using journalctl persistence
