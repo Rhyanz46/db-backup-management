@@ -97,51 +97,23 @@ impl CronJobCli {
             "Setiap N menit" => {
                 let interval = CustomType::<u32>::new("Interval (menit):")
                     .with_error_message("Masukkan angka yang valid (1-59)")
-                    .with_validator(|val: &u32| {
-                        if *val == 0 || *val > 59 {
-                            Err("Interval harus antara 1-59 menit".into())
-                        } else {
-                            Ok(())
-                        }
-                    })
-                    .prompt()?;
+                                        .prompt()?;
                 ScheduleType::Minutes { interval }
             }
             "Setiap N jam" => {
                 let interval = CustomType::<u32>::new("Interval (jam):")
                     .with_error_message("Masukkan angka yang valid (1-23)")
-                    .with_validator(|val| {
-                        if *val == 0 || *val > 23 {
-                            Err("Interval harus antara 1-23 jam".into())
-                        } else {
-                            Ok(())
-                        }
-                    })
-                    .prompt()?;
+                                        .prompt()?;
                 ScheduleType::Hours { interval }
             }
             "Harian pukul waktu tertentu" => {
                 let hour = CustomType::<u32>::new("Jam (0-23):")
                     .with_error_message("Masukkan jam yang valid (0-23)")
-                    .with_validator(|val| {
-                        if *val > 23 {
-                            Err("Jam harus antara 0-23".into())
-                        } else {
-                            Ok(())
-                        }
-                    })
-                    .prompt()?;
+                                        .prompt()?;
 
                 let minute = CustomType::<u32>::new("Menit (0-59):")
                     .with_error_message("Masukkan menit yang valid (0-59)")
-                    .with_validator(|val| {
-                        if *val > 59 {
-                            Err("Menit harus antara 0-59".into())
-                        } else {
-                            Ok(())
-                        }
-                    })
-                    .prompt()?;
+                                        .prompt()?;
 
                 ScheduleType::Daily { hour, minute }
             }
@@ -162,58 +134,23 @@ impl CronJobCli {
                     .unwrap() as u32;
 
                 let hour = CustomType::<u32>::new("Jam (0-23):")
-                    .with_validator(|val| {
-                        if *val > 23 {
-                            Err("Jam harus antara 0-23".into())
-                        } else {
-                            Ok(())
-                        }
-                    })
-                    .prompt()?;
+                                        .prompt()?;
 
                 let minute = CustomType::<u32>::new("Menit (0-59):")
-                    .with_validator(|val| {
-                        if *val > 59 {
-                            Err("Menit harus antara 0-59".into())
-                        } else {
-                            Ok(())
-                        }
-                    })
-                    .prompt()?;
+                                        .prompt()?;
 
                 ScheduleType::Weekly { day_of_week, hour, minute }
             }
             "Bulanan (tanggal + waktu)" => {
                 let day_of_month = CustomType::<u32>::new("Tanggal (1-31):")
                     .with_error_message("Masukkan tanggal yang valid (1-31)")
-                    .with_validator(|val| {
-                        if *val == 0 || *val > 31 {
-                            Err("Tanggal harus antara 1-31".into())
-                        } else {
-                            Ok(())
-                        }
-                    })
-                    .prompt()?;
+                                        .prompt()?;
 
                 let hour = CustomType::<u32>::new("Jam (0-23):")
-                    .with_validator(|val| {
-                        if *val > 23 {
-                            Err("Jam harus antara 0-23".into())
-                        } else {
-                            Ok(())
-                        }
-                    })
-                    .prompt()?;
+                                        .prompt()?;
 
                 let minute = CustomType::<u32>::new("Menit (0-59):")
-                    .with_validator(|val| {
-                        if *val > 59 {
-                            Err("Menit harus antara 0-59".into())
-                        } else {
-                            Ok(())
-                        }
-                    })
-                    .prompt()?;
+                                        .prompt()?;
 
                 ScheduleType::Monthly { day_of_month, hour, minute }
             }
@@ -259,7 +196,7 @@ impl CronJobCli {
         let mut manager = CronJobManager::new(&self.config_dir);
         manager.load()?;
 
-        let jobs = manager.list_jobs();
+        let jobs = manager.list_jobs().to_vec();
         if jobs.is_empty() {
             println!("❌ Tidak ada cronjob yang bisa diedit.");
             return Ok(());
@@ -270,7 +207,7 @@ impl CronJobCli {
             .map(|job| format!("{} ({})", job.name, if job.enabled { "Aktif" } else { "Nonaktif" }))
             .collect();
 
-        let choice = Select::new("Pilih cronjob yang ingin diedit:", job_choices)
+        let choice = Select::new("Pilih cronjob yang ingin diedit:", job_choices.clone())
             .prompt()?;
 
         let selected_index = job_choices.iter().position(|c| *c == choice).unwrap();
@@ -304,7 +241,7 @@ impl CronJobCli {
         let mut manager = CronJobManager::new(&self.config_dir);
         manager.load()?;
 
-        let jobs = manager.list_jobs();
+        let jobs = manager.list_jobs().to_vec();
         if jobs.is_empty() {
             println!("❌ Tidak ada cronjob yang bisa dihapus.");
             return Ok(());
@@ -315,7 +252,7 @@ impl CronJobCli {
             .map(|job| format!("{} ({})", job.name, job.schedule_type.get_description()))
             .collect();
 
-        let choice = Select::new("Pilih cronjob yang ingin dihapus:", job_choices)
+        let choice = Select::new("Pilih cronjob yang ingin dihapus:", job_choices.clone())
             .prompt()?;
 
         let selected_index = job_choices.iter().position(|c| *c == choice).unwrap();
@@ -345,7 +282,7 @@ impl CronJobCli {
         let mut manager = CronJobManager::new(&self.config_dir);
         manager.load()?;
 
-        let jobs = manager.list_jobs();
+        let jobs = manager.list_jobs().to_vec();
         if jobs.is_empty() {
             println!("❌ Tidak ada cronjob yang bisa diubah statusnya.");
             return Ok(());
@@ -356,13 +293,14 @@ impl CronJobCli {
             .map(|job| format!("{} - Status: {}", job.name, if job.enabled { "✅ Aktif" } else { "❌ Nonaktif" }))
             .collect();
 
-        let choice = Select::new("Pilih cronjob untuk mengubah status:", job_choices)
+        let choice = Select::new("Pilih cronjob untuk mengubah status:", job_choices.clone())
             .prompt()?;
 
         let selected_index = job_choices.iter().position(|c| *c == choice).unwrap();
         let job = &jobs[selected_index];
+        let job_id = job.id.clone();
 
-        manager.toggle_job(&job.id)?;
+        manager.toggle_job(&job_id)?;
 
         let new_status = if job.enabled { "Nonaktif" } else { "Aktif" };
         println!("✅ Status cronjob '{}' berhasil diubah menjadi '{}'", job.name, new_status);
@@ -374,7 +312,7 @@ impl CronJobCli {
         let mut manager = CronJobManager::new(&self.config_dir);
         manager.load()?;
 
-        let jobs = manager.list_jobs();
+        let jobs = manager.list_jobs().to_vec();
         if jobs.is_empty() {
             println!("❌ Tidak ada cronjob yang bisa dieksekusi.");
             return Ok(());
@@ -385,11 +323,12 @@ impl CronJobCli {
             .map(|job| format!("{} ({})", job.name, job.schedule_type.get_description()))
             .collect();
 
-        let choice = Select::new("Pilih cronjob untuk dieksekusi sekarang:", job_choices)
+        let choice = Select::new("Pilih cronjob untuk dieksekusi sekarang:", job_choices.clone())
             .prompt()?;
 
         let selected_index = job_choices.iter().position(|c| *c == choice).unwrap();
         let job = &jobs[selected_index];
+        let job_id = job.id.clone();
 
         println!("\n⚡ Mengeksekusi cronjob: {}", job.name);
 
@@ -397,7 +336,7 @@ impl CronJobCli {
         let result = job.execute(&self.config_dir, "/etc/backup-service/backup");
 
         // Update statistics
-        manager.update_job_stats(&job.id, result.is_ok())?;
+        manager.update_job_stats(&job_id, result.is_ok())?;
 
         if result.is_ok() {
             println!("✅ Cronjob berhasil dieksekusi!");
@@ -412,7 +351,7 @@ impl CronJobCli {
         let mut manager = CronJobManager::new(&self.config_dir);
         manager.load()?;
 
-        let jobs = manager.list_jobs();
+        let jobs = manager.list_jobs().to_vec();
         if jobs.is_empty() {
             println!("❌ Tidak ada cronjob yang tersedia.");
             return Ok(());
@@ -456,7 +395,7 @@ impl CronJobCli {
                     let _ = notifier.send_cronjob_schedule_notification(
                         &cronjob.name,
                         &cronjob.schedule_type.get_description(),
-                        cronjob.next_run.map(|dt| dt.naive_local()),
+                        cronjob.next_run.map(|dt| dt.with_timezone(&chrono::Local)),
                     ).await;
                 }
             }

@@ -162,7 +162,7 @@ impl TelegramNotifier {
                 ).filter(|s| !s.is_empty()).collect::<Vec<_>>().join("\n")
             } else {
                 format!("• {} schemas (first 10 shown)",
-                    schemas.iter().take(10).collect::<Vec<_>>().join(", "))
+                                    schemas.iter().take(10).map(|s| s.as_str()).collect::<Vec<_>>().join(", "))
             },
             chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
         );

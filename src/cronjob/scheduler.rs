@@ -46,9 +46,9 @@ impl CronScheduler {
     pub async fn start(&mut self) -> Result<()> {
         if let Some(scheduler) = &self.scheduler {
             // Add all enabled jobs to scheduler
-            let jobs = {
+            let jobs: Vec<CronJob> = {
                 let manager = self.job_manager.read().await;
-                manager.list_enabled_jobs().clone()
+                manager.list_enabled_jobs().into_iter().map(|j| (*j).clone()).collect()
             };
 
             let jobs_count = jobs.len();
@@ -127,7 +127,7 @@ impl CronScheduler {
     }
 
     pub async fn stop(&mut self) -> Result<()> {
-        if let Some(scheduler) = self.scheduler.take() {
+        if let Some(mut scheduler) = self.scheduler.take() {
             scheduler.shutdown().await
                 .context("Failed to shutdown scheduler")?;
             info!("Cronjob scheduler stopped");
@@ -261,7 +261,7 @@ async fn execute_cronjob(job_id: &str, config_dir: &str, backup_dir: &str) -> Re
         let _ = notifier.send_cronjob_schedule_notification(
             &job.name,
             &job.schedule_type.get_description(),
-            job.next_run.map(|dt| dt.naive_local())
+            job.next_run.map(|dt| dt.with_timezone(&chrono::Local))
         ).await;
     }
 
@@ -281,7 +281,7 @@ async fn execute_cronjob(job_id: &str, config_dir: &str, backup_dir: &str) -> Re
     let duration = start_time.elapsed();
     let duration_seconds = duration.as_secs();
 
-    let execution_result = if output.status.success() {
+    if output.status.success() {
         debug!("Backup command executed successfully for job: {}", job_id);
 
         // Parse output to get backup info
@@ -329,7 +329,7 @@ async fn execute_cronjob(job_id: &str, config_dir: &str, backup_dir: &str) -> Re
             duration_seconds,
             error_message: Some(error_msg.to_string()),
         })
-    };
+    }
 }
 
 #[derive(Debug, Clone)]

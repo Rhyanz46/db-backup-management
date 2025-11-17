@@ -347,10 +347,8 @@ impl CronJobManager {
 
         // 6. Validate timestamps
         if let Some(last_run) = job.last_run {
-            if let Some(created_at) = job.created_at {
-                if last_run < created_at {
-                    return Err(anyhow::anyhow!("Last run time cannot be before creation time"));
-                }
+            if last_run < job.created_at {
+                return Err(anyhow::anyhow!("Last run time cannot be before creation time"));
             }
         }
 
@@ -379,7 +377,7 @@ impl CronJobManager {
 
             if !valid_patterns.iter().any(|&pattern| part.starts_with(pattern)) &&
                !part.contains('-') && // Allow ranges like 1-5
-               part.as_str() != "?" {  // Allow question marks
+               *part != "?" {  // Allow question marks
                 return false;
             }
         }
