@@ -75,9 +75,12 @@ install: build
 	$(call check_port_available,$(INSTALL_PORT))
 
 	# Create user if not exists
-	@if ! id $(SERVICE_USER) &>/dev/null; then \
+	@echo "$(BLUE)Checking user $(SERVICE_USER)...$(NC)"
+	@if ! id $(SERVICE_USER) >/dev/null 2>&1; then \
 		echo "$(BLUE)Creating user $(SERVICE_USER)...$(NC)"; \
 		sudo useradd -r -s /bin/false -d /var/lib/$(SERVICE_NAME) $(SERVICE_USER); \
+	else \
+		echo "$(GREEN)✓ User $(SERVICE_USER) already exists$(NC)"; \
 	fi
 
 	# Install binary
