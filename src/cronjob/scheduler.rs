@@ -2,16 +2,19 @@ use anyhow::{Result, Context};
 use tokio_cron_scheduler::{Job, JobScheduler};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use log::{info, error, debug};
+use log::{info, error, debug, warn};
 use super::{CronJobManager, CronJob};
 use crate::config::TelegramManager;
 use crate::notifications::TelegramNotifier;
+use std::time::SystemTime;
+use std::fs;
 
 pub struct CronScheduler {
     scheduler: Option<JobScheduler>,
     job_manager: Arc<RwLock<CronJobManager>>,
     config_dir: String,
     backup_dir: String,
+    last_config_modified: Option<SystemTime>,
 }
 
 impl CronScheduler {
@@ -21,6 +24,7 @@ impl CronScheduler {
             job_manager: Arc::new(RwLock::new(CronJobManager::new(config_dir))),
             config_dir: config_dir.to_string(),
             backup_dir: backup_dir.to_string(),
+            last_config_modified: None,
         }
     }
 
@@ -135,19 +139,114 @@ impl CronScheduler {
         Ok(())
     }
 
+    /// Get the config file path
+    fn get_config_file_path(&self) -> String {
+        format!("{}/cronjobs.json", self.config_dir)
+    }
+
+    /// Get the modification time of the config file
+    fn get_config_modified_time(&self) -> Option<SystemTime> {
+        let config_path = self.get_config_file_path();
+        fs::metadata(&config_path)
+            .ok()
+            .and_then(|metadata| metadata.modified().ok())
+    }
+
+    /// Check if the config file has been modified since last check
+    async fn has_config_changed(&mut self) -> bool {
+        let current_modified = self.get_config_modified_time();
+
+        // If we don't have a last modified time, initialize it and return false
+        if self.last_config_modified.is_none() {
+            self.last_config_modified = current_modified;
+            return false;
+        }
+
+        // Check if modification time has changed
+        match (self.last_config_modified, current_modified) {
+            (Some(last), Some(current)) => {
+                if current > last {
+                    info!("Config file change detected!");
+                    self.last_config_modified = Some(current);
+                    true
+                } else {
+                    false
+                }
+            }
+            (Some(_), None) => {
+                warn!("Config file was deleted!");
+                false
+            }
+            (None, Some(current)) => {
+                info!("Config file appeared!");
+                self.last_config_modified = Some(current);
+                true
+            }
+            (None, None) => false,
+        }
+    }
+
+    /// Reload all jobs from config file and re-schedule them
+    async fn reload_jobs(&mut self) -> Result<()> {
+        info!("🔄 Reloading cronjob configuration...");
+
+        // Check if scheduler is initialized
+        if self.scheduler.is_none() {
+            error!("Scheduler not initialized, cannot reload jobs");
+            return Err(anyhow::anyhow!("Scheduler not initialized"));
+        }
+
+        // 1. Shutdown existing scheduler
+        debug!("Shutting down existing scheduler...");
+        if let Some(mut scheduler) = self.scheduler.take() {
+            let _ = scheduler.shutdown().await;
+        }
+
+        // 2. Reload config from file
+        {
+            let mut manager = self.job_manager.write().await;
+            manager.load()
+                .context("Failed to reload cronjob configuration")?;
+        }
+
+        // 3. Reinitialize and start scheduler with new jobs
+        self.initialize().await?;
+        self.start().await?;
+
+        let jobs_count = {
+            let manager = self.job_manager.read().await;
+            manager.list_enabled_jobs().len()
+        };
+
+        info!("✅ Configuration reloaded successfully! Active jobs: {}", jobs_count);
+
+        Ok(())
+    }
+
     pub async fn run_forever(&mut self) -> Result<()> {
         self.start().await?;
 
-        info!("Cronjob scheduler is running. Press Ctrl+C to stop.");
+        // Initialize config modification tracking
+        self.last_config_modified = self.get_config_modified_time();
+
+        info!("Cronjob scheduler is running with hot-reload enabled (checking every 30s)");
+        info!("Press Ctrl+C to stop.");
 
         // Keep the scheduler running indefinitely
         loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
 
-            // Periodically check if scheduler is still running
+            // 1. Check for config file changes and reload if needed
+            if self.has_config_changed().await {
+                info!("📝 Config file modified, initiating hot-reload...");
+                if let Err(e) = self.reload_jobs().await {
+                    error!("Failed to reload jobs after config change: {}", e);
+                    error!("Scheduler will continue with existing jobs");
+                }
+            }
+
+            // 2. Health check - ensure scheduler is still running
             if self.scheduler.is_some() {
-                // Simple health check - if scheduler is not running, try to restart it
-                // This is a simplified approach - in production you'd want better monitoring
                 debug!("Scheduler health check - running normally");
             } else {
                 error!("Scheduler is None, attempting to restart...");
