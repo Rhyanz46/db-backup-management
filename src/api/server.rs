@@ -102,6 +102,42 @@ pub async fn start_rest_server(config_dir: &str, backup_dir: &str, port: u16) ->
     Ok(())
 }
 
+/// Start REST API server WITHOUT cronjob scheduler
+pub async fn start_rest_server_only(config_dir: &str, backup_dir: &str, port: u16) -> Result<()> {
+    // Start REST API server ONLY
+    let app_state = AppState {
+        config_dir: Arc::new(config_dir.to_string()),
+        backup_dir: Arc::new(backup_dir.to_string()),
+    };
+
+    let app = Router::new()
+        .route("/", get(health_check))
+        .route("/health", get(health_check))
+        .route("/backup", post(trigger_backup))
+        .route("/backup", get(list_backups))
+        .with_state(app_state);
+
+    let addr = format!("0.0.0.0:{}", port);
+    let listener = TcpListener::bind(&addr).await?;
+
+    println!("🚀 REST API Server started on {}", listener.local_addr()?);
+    println!("⚠️  Cronjob scheduler NOT started (use --start-cronjob for separate service)");
+    println!("📡 Available endpoints:");
+    println!("   GET  /health - Health check");
+    println!("   POST /backup - Trigger backup");
+    println!("   GET  /backup - List backups");
+    println!("");
+    println!("💡 To start cronjob scheduler:");
+    println!("   CLI: ./backup-service server --start-cronjob");
+
+    // Run REST API server only
+    axum::serve(listener, app)
+        .await
+        .context("Failed to start REST server")?;
+
+    Ok(())
+}
+
 pub async fn health_check(
     State(state): State<AppState>,
 ) -> Result<Json<HealthResponse>, StatusCode> {

@@ -1,26 +1,26 @@
 [Unit]
-Description=PostgreSQL Backup Management Service
+Description=PostgreSQL Backup Management Service - Cronjob Scheduler (%I)
 Documentation=https://github.com/your-repo/backup-service
 After=network.target postgresql.service
 Wants=postgresql.service
 
 [Service]
 Type=simple
-User={{SERVICE_USER}}
-Group={{SERVICE_USER}}
+User=%i
+Group=%i
 WorkingDirectory=/etc/backup-service
 Environment="RUST_LOG=info"
 Environment="RUST_BACKTRACE=1"
 
 # Create log directory before starting
 ExecStartPre=/bin/mkdir -p /var/log/backup-service
-ExecStartPre=/bin/chown {{SERVICE_USER}}:{{SERVICE_USER}} /var/log/backup-service
+ExecStartPre=/bin/chown %i:%i /var/log/backup-service
 
-# Main executable command with port configuration
+# Cronjob scheduler command (without REST API)
 ExecStart={{EXEC_PATH}} server \
   --config-dir {{CONFIG_DIR}} \
   --backup-dir {{BACKUP_DIR}} \
-  --port {{SERVICE_PORT}}
+  --start-cronjob
 
 # Restart configuration
 Restart=always
@@ -41,7 +41,7 @@ LimitNOFILE=65536
 # Logging
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=backup-service
+SyslogIdentifier=backup-service-cronjob-%i
 
 [Install]
 WantedBy=multi-user.target

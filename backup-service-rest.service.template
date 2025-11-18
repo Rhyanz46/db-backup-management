@@ -1,5 +1,5 @@
 [Unit]
-Description=PostgreSQL Backup Management Service
+Description=PostgreSQL Backup Management Service - REST API
 Documentation=https://github.com/your-repo/backup-service
 After=network.target postgresql.service
 Wants=postgresql.service
@@ -16,11 +16,12 @@ Environment="RUST_BACKTRACE=1"
 ExecStartPre=/bin/mkdir -p /var/log/backup-service
 ExecStartPre=/bin/chown {{SERVICE_USER}}:{{SERVICE_USER}} /var/log/backup-service
 
-# Main executable command with port configuration
+# REST API server command (without cronjob)
 ExecStart={{EXEC_PATH}} server \
   --config-dir {{CONFIG_DIR}} \
   --backup-dir {{BACKUP_DIR}} \
-  --port {{SERVICE_PORT}}
+  --port {{SERVICE_PORT}} \
+  --start-rest
 
 # Restart configuration
 Restart=always
@@ -41,7 +42,7 @@ LimitNOFILE=65536
 # Logging
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=backup-service
+SyslogIdentifier=backup-service-rest
 
 [Install]
 WantedBy=multi-user.target

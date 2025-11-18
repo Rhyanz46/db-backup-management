@@ -47,7 +47,15 @@ enum Commands {
     /// Start interactive CLI mode
     Run,
     /// Start REST API server
-    Server,
+    Server {
+        /// Start only REST API server (without cronjob)
+        #[arg(long)]
+        start_rest: bool,
+
+        /// Start only cronjob scheduler (without REST API)
+        #[arg(long)]
+        start_cronjob: bool,
+    },
     /// Create backup of all schemas from active server
     Backup,
     /// List all backups
@@ -127,9 +135,17 @@ async fn main() -> Result<()> {
             let mut cli_interface = CliInterface::new(&cli.config_dir, &cli.backup_dir);
             cli_interface.run().await?;
         }
-        Commands::Server => {
-            info!("Starting REST API server on port {}", cli.port);
-            api::start_rest_server(&cli.config_dir, &cli.backup_dir, cli.port).await?;
+        Commands::Server { start_rest, start_cronjob } => {
+            if start_rest {
+                info!("Starting REST API server on port {} (no cronjob)", cli.port);
+                api::start_rest_server_only(&cli.config_dir, &cli.backup_dir, cli.port).await?;
+            } else if start_cronjob {
+                info!("Starting cronjob scheduler only (no REST API)");
+                cronjob::start_cronjob_scheduler(&cli.config_dir, &cli.backup_dir).await?;
+            } else {
+                info!("Starting REST API server with cronjob on port {}", cli.port);
+                api::start_rest_server(&cli.config_dir, &cli.backup_dir, cli.port).await?;
+            }
         }
         Commands::Backup => {
             info!("Creating backup from active server");

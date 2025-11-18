@@ -21,6 +21,13 @@ else
     INSTALL_PORT=$(SERVICE_PORT)
 endif
 
+# Allow BACKUP_DIR override for service targets
+ifdef BACKUP_DIR
+    SERVICE_BACKUP_DIR=$(BACKUP_DIR)
+else
+    SERVICE_BACKUP_DIR=$(BACKUP_DATA_DIR)
+endif
+
 # Color codes for output
 RED=\033[0;31m
 GREEN=\033[0;32m
@@ -96,7 +103,7 @@ install: build
 	@echo "$(BLUE)Installing systemd service...$(NC)"
 	@sed "s|{{EXEC_PATH}}|$(INSTALL_PREFIX)/$(BINARY_NAME)|g; \
 	     s|{{CONFIG_DIR}}|$(BACKUP_CONFIG_DIR)|g; \
-	     s|{{BACKUP_DIR}}|$(BACKUP_DATA_DIR)|g; \
+	     s|{{BACKUP_DIR}}|$(SERVICE_BACKUP_DIR)|g; \
 	     s|{{SERVICE_USER}}|$(SERVICE_USER)|g; \
 	     s|{{SERVICE_PORT}}|$(INSTALL_PORT)|g" \
 	     backup-service.service.template > backup-service.service
@@ -526,3 +533,207 @@ help:
 	@echo "  SERVICE_PORT             # Default REST server port ($(SERVICE_PORT))"
 	@echo "  INSTALL_PREFIX           # Installation directory ($(INSTALL_PREFIX))"
 	@echo "  SERVICE_USER             # Service user ($(SERVICE_USER))"
+	@echo ""
+	@echo "$(GREEN)🔀 Separated Services:$(NC)"
+	@echo "  install-rest                              # Install REST API only service"
+	@echo "  install-cronjob USER=xxx                 # Install cronjob service with custom user"
+	@echo ""
+	@echo "$(GREEN)📋 Examples:$(NC)"
+	@echo "  make install-rest BACKUP_DIR=/home/dev/backups              # Install with custom backup dir"
+	@echo "  make install-cronjob USER=dev BACKUP_DIR=/home/dev/backups # Install with custom user & backup"
+	@echo "  make service-start-cronjob USER=dev BACKUP_DIR=/home/dev/backups # Start with custom paths"
+	@echo "  make service-start-rest BACKUP_DIR=/var/lib/backups         # Start REST with custom backup"
+	@echo ""
+	@echo "$(GREEN)🎯 Usage:$(NC)"
+	@echo "  ./backup-service server --start-rest --backup-dir /home/dev/backups"
+	@echo "  ./backup-service server --start-cronjob --backup-dir /home/dev/backups"
+	@echo ""
+	@echo "$(GREEN)📁 Default Paths:$(NC)"
+	@echo "  Config: /etc/backup-service/config"
+	@echo "  Backup: $(BACKUP_DATA_DIR)"
+
+# Install REST API service only
+.PHONY: install-rest
+install-rest:
+	@echo "$(BLUE)Installing REST API service only...$(NC)"
+	@$(MAKE) build
+	@echo "$(BLUE)Installing binary to $(INSTALL_PREFIX)...$(NC)"
+	@sudo install -D -m 755 $(BUILD_DIR)/$(BINARY_NAME) $(INSTALL_PREFIX)/$(BINARY_NAME)
+	@echo "$(GREEN)✅ Binary installed$(NC)"
+
+# Create directories
+	@sudo mkdir -p $(BACKUP_CONFIG_DIR) $(SERVICE_BACKUP_DIR)
+	@sudo mkdir -p /var/log/backup-service
+	@sudo chown $(SERVICE_USER):$(SERVICE_USER) /var/log/backup-service 2>/dev/null || echo "$(YELLOW)Note: User $(SERVICE_USER) will be created below$(NC)"
+
+# Create service user
+	@echo "$(BLUE)Checking user $(SERVICE_USER)...$(NC)"
+	@if ! id $(SERVICE_USER) >/dev/null 2>&1; then \
+		echo "$(BLUE)Creating user $(SERVICE_USER)...$(NC)"; \
+		sudo useradd -r -s /bin/false -d /var/lib/$(SERVICE_NAME) $(SERVICE_USER); \
+	else \
+		echo "$(GREEN)✓ User $(SERVICE_USER) already exists$(NC)"; \
+	fi
+
+# Install systemd service
+	@echo "$(BLUE)Installing REST API systemd service...$(NC)"
+	@sed -e "s|{{EXEC_PATH}}|$(INSTALL_PREFIX)/$(BINARY_NAME)|g; \
+	     s|{{CONFIG_DIR}}|$(BACKUP_CONFIG_DIR)|g; \
+	     s|{{BACKUP_DIR}}|$(SERVICE_BACKUP_DIR)|g; \
+	     s|{{SERVICE_PORT}}|$(INSTALL_PORT)|g; \
+	     s|{{SERVICE_USER}}|$(SERVICE_USER)|g" \
+	     backup-service-rest.service.template > backup-service-rest.service
+	@sudo cp backup-service-rest.service $(SERVICE_DIR)/backup-service-rest.service
+	@sudo systemctl daemon-reload
+	@sudo systemctl enable backup-service-rest
+
+# Set permissions
+	@sudo chown -R $(SERVICE_USER):$(SERVICE_USER) $(SERVICE_BACKUP_DIR) 2>/dev/null || true
+	@sudo chown $(SERVICE_USER):$(SERVICE_USER) /var/log/backup-service 2>/dev/null || true
+
+	@echo ""
+	@echo "$(GREEN)🎉 REST API service installation completed!$(NC)"
+	@echo "$(BLUE)Installation details:$(NC)"
+	@echo "  • Binary: $(INSTALL_PREFIX)/$(BINARY_NAME)"
+	@echo "  • Config directory: $(BACKUP_CONFIG_DIR)"
+	@echo "  • Backup directory: $(BACKUP_DATA_DIR)"
+	@echo "  • Service port: $(INSTALL_PORT)"
+	@echo "  • Service name: backup-service-rest"
+	@echo ""
+	@echo "$(YELLOW)Next steps:$(NC)"
+	@echo "  make service-start-rest    # Start REST API service"
+	@echo "  make service-status-rest   # Check REST API service status"
+
+# Install cronjob service with custom user
+.PHONY: install-cronjob
+ifndef USER
+	$(error USER parameter is required. Usage: make install-cronjob USER=username)
+endif
+
+install-cronjob:
+	@echo "$(BLUE)Installing cronjob service for user '$(USER)'...$(NC)"
+	@$(MAKE) build
+	@echo "$(BLUE)Installing binary to $(INSTALL_PREFIX)...$(NC)"
+	@sudo install -D -m 755 $(BUILD_DIR)/$(BINARY_NAME) $(INSTALL_PREFIX)/$(BINARY_NAME)
+	@echo "$(GREEN)✅ Binary installed$(NC)"
+
+# Create directories
+	@sudo mkdir -p $(BACKUP_CONFIG_DIR) $(SERVICE_BACKUP_DIR)
+	@sudo mkdir -p /var/log/backup-service
+
+# Create service user if doesn't exist
+	@echo "$(BLUE)Checking user '$(USER)'...$(NC)"
+	@if ! id $(USER) >/dev/null 2>&1; then \
+		echo "$(BLUE)Creating user $(USER)...$(NC)"; \
+		sudo useradd -r -s /bin/false -d /var/lib/$(SERVICE_NAME) $(USER); \
+	else \
+		echo "$(GREEN)✓ User $(USER) already exists$(NC)"; \
+	fi
+
+# Set ownership
+	@sudo chown -R $(USER):$(USER) $(SERVICE_BACKUP_DIR) 2>/dev/null || true
+	@sudo chown -R $(USER):$(USER) /var/log/backup-service
+
+# Install systemd service (template for user parameter)
+	@echo "$(BLUE)Installing cronjob systemd service...$(NC)"
+	@sed -e "s|{{EXEC_PATH}}|$(INSTALL_PREFIX)/$(BINARY_NAME)|g; \
+	     s|{{CONFIG_DIR}}|$(BACKUP_CONFIG_DIR)|g; \
+	     s|{{BACKUP_DIR}}|$(BACKUP_DATA_DIR)|g" \
+	     backup-service-cronjob@.service.template > backup-service-cronjob@.service
+	@sudo cp backup-service-cronjob@.service $(SERVICE_DIR)/backup-service-cronjob@.service
+	@sudo systemctl daemon-reload
+
+# Enable service for specific user
+	@sudo systemctl enable backup-service-cronjob@$(USER)
+
+	@echo ""
+	@echo "$(GREEN)🎉 Cronjob service installation completed!$(NC)"
+	@echo "$(BLUE)Installation details:$(NC)"
+	@echo "  • Binary: $(INSTALL_PREFIX)/$(BINARY_NAME)"
+	@echo "  • Config directory: $(BACKUP_CONFIG_DIR)"
+	@echo "  • Backup directory: $(BACKUP_DATA_DIR)"
+	@echo "  • Service user: $(USER)"
+	@echo "  • Service name: backup-service-cronjob@$(USER)"
+	@echo ""
+	@echo "$(YELLOW)Next steps:$(NC)"
+	@echo "  make service-start-cronjob USER=$(USER)    # Start cronjob service"
+	@echo "  make service-status-cronjob USER=$(USER)   # Check cronjob service status"
+
+# Service management for separated services
+.PHONY: service-start-rest
+service-start-rest:
+	@echo "$(BLUE)Starting REST API service...$(NC)"
+	@echo "$(YELLOW)Using backup directory: $(SERVICE_BACKUP_DIR)$(NC)"
+	@sudo systemctl start backup-service-rest
+	@if sudo systemctl is-active --quiet backup-service-rest; then \
+		echo "$(GREEN)✅ REST API service started successfully!$(NC)"; \
+	else \
+		echo "$(RED)❌ Failed to start REST API service$(NC)"; \
+		echo "$(YELLOW)Check logs with: make service-logs-rest$(NC)"; \
+		exit 1; \
+	fi
+
+.PHONY: service-stop-rest
+service-stop-rest:
+	@echo "$(BLUE)Stopping REST API service...$(NC)"
+	@sudo systemctl stop backup-service-rest
+	@echo "$(GREEN)✅ REST API service stopped$(NC)"
+
+.PHONY: service-status-rest
+service-status-rest:
+	@echo "$(BLUE)REST API Service Status:$(NC)"
+	@echo "$(YELLOW)================================$(NC)"
+	@sudo systemctl status backup-service-rest --no-pager || echo "$(RED)Service not found$(NC)"
+
+.PHONY: service-logs-rest
+service-logs-rest:
+	@echo "$(BLUE)Showing REST API service logs (Ctrl+C to exit):$(NC)"
+	@echo "$(YELLOW)================================$(NC)"
+	@sudo journalctl -u backup-service-rest -f
+
+.PHONY: service-start-cronjob
+ifndef USER
+	$(error USER parameter is required. Usage: make service-start-cronjob USER=username)
+endif
+
+service-start-cronjob:
+	@echo "$(BLUE)Starting cronjob service for user '$(USER)'...$(NC)"
+	@echo "$(YELLOW)Using backup directory: $(SERVICE_BACKUP_DIR)$(NC)"
+	@sudo systemctl start backup-service-cronjob@$(USER)
+	@if sudo systemctl is-active --quiet backup-service-cronjob@$(USER); then \
+		echo "$(GREEN)✅ Cronjob service started successfully!$(NC)"; \
+	else \
+		echo "$(RED)❌ Failed to start cronjob service$(NC)"; \
+		echo "$(YELLOW)Check logs with: make service-logs-cronjob USER=$(USER)$(NC)"; \
+		exit 1; \
+	fi
+
+.PHONY: service-stop-cronjob
+ifndef USER
+	$(error USER parameter is required. Usage: make service-stop-cronjob USER=username)
+endif
+
+service-stop-cronjob:
+	@echo "$(BLUE)Stopping cronjob service for user '$(USER)'...$(NC)"
+	@sudo systemctl stop backup-service-cronjob@$(USER)
+	@echo "$(GREEN)✅ Cronjob service stopped$(NC)"
+
+.PHONY: service-status-cronjob
+ifndef USER
+	$(error USER parameter is required. Usage: make service-status-cronjob USER=username)
+endif
+
+service-status-cronjob:
+	@echo "$(BLUE)Cronjob Service Status ($(USER)):$(NC)"
+	@echo "$(YELLOW)=====================================$(NC)"
+	@sudo systemctl status backup-service-cronjob@$(USER) --no-pager || echo "$(RED)Service not found$(NC)"
+
+.PHONY: service-logs-cronjob
+ifndef USER
+	$(error USER parameter is required. Usage: make service-logs-cronjob USER=username)
+endif
+
+service-logs-cronjob:
+	@echo "$(BLUE)Showing cronjob service logs for '$(USER)' (Ctrl+C to exit):$(NC)"
+	@echo "$(YELLOW)==================================================$(NC)"
+	@sudo journalctl -u backup-service-cronjob@$(USER) -f
