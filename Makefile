@@ -127,76 +127,7 @@ install: build
 	@echo "  make firewall-setup PORT=$(INSTALL_PORT)  # Configure firewall"
 
 # Enhanced service management targets
-.PHONY: service-start
-service-start:
-	@echo "$(BLUE)Starting $(SERVICE_NAME) service...$(NC)"
-	@if sudo systemctl start backup-service; then \
-		echo "$(GREEN)✅ Service started successfully!$(NC)"; \
-		sleep 2; \
-		if sudo systemctl is-active --quiet backup-service; then \
-			echo "$(GREEN)✅ Service is running properly$(NC)"; \
-		else \
-			echo "$(RED)❌ Service failed to start properly$(NC)"; \
-			echo "$(YELLOW)Check logs with: make service-logs$(NC)"; \
-		fi; \
-	else \
-		echo "$(RED)❌ Failed to start service$(NC)"; \
-		exit 1; \
-	fi
-
-.PHONY: service-stop
-service-stop:
-	@echo "$(YELLOW)Stopping $(SERVICE_NAME) service...$(NC)"
-	@if sudo systemctl is-active --quiet backup-service; then \
-		if sudo systemctl stop backup-service; then \
-			echo "$(GREEN)✅ Service stopped successfully!$(NC)"; \
-		else \
-			echo "$(RED)❌ Failed to stop service$(NC)"; \
-			exit 1; \
-		fi; \
-	else \
-		echo "$(YELLOW)⚠️  Service is already stopped$(NC)"; \
-	fi
-
-.PHONY: service-restart
-service-restart:
-	@echo "$(BLUE)Restarting $(SERVICE_NAME) service...$(NC)"
-	@if sudo systemctl restart backup-service; then \
-		echo "$(GREEN)✅ Service restarted successfully!$(NC)"; \
-		sleep 2; \
-		if sudo systemctl is-active --quiet backup-service; then \
-			echo "$(GREEN)✅ Service is running properly$(NC)"; \
-		else \
-			echo "$(RED)❌ Service failed to restart properly$(NC)"; \
-			echo "$(YELLOW)Check logs with: make service-logs$(NC)"; \
-		fi; \
-	else \
-		echo "$(RED)❌ Failed to restart service$(NC)"; \
-		exit 1; \
-	fi
-
-.PHONY: service-status
-service-status:
-	@echo "$(BLUE)$(SERVICE_NAME) Service Status:$(NC)"
-	@echo "$(YELLOW)================================$(NC)"
-	@if sudo systemctl is-active --quiet backup-service; then \
-		echo "$(GREEN)Status: RUNNING$(NC)"; \
-	else \
-		echo "$(RED)Status: STOPPED$(NC)"; \
-	fi
-	@if sudo systemctl is-enabled --quiet backup-service; then \
-		echo "$(GREEN)Enabled: YES$(NC)"; \
-	else \
-		echo "$(YELLOW)Enabled: NO$(NC)"; \
-	fi
-	@echo ""
-	@sudo systemctl status backup-service --no-pager -l
-
-.PHONY: service-logs
-service-logs:
-	@echo "$(BLUE)Showing $(SERVICE_NAME) service logs (Ctrl+C to exit):$(NC)"
-	@echo "$(YELLOW)================================$(NC)"
-	sudo journalctl -u backup-service -f
+# Old service management targets - replaced by script-based management (see below)
 
 .PHONY: service-debug
 service-debug:
@@ -552,44 +483,16 @@ help:
 	@echo "  Config: /etc/backup-service/config"
 	@echo "  Backup: $(BACKUP_DATA_DIR)"
 
-# Install REST API service only
+# Install REST API service only using scripts
 .PHONY: install-rest
 install-rest:
-	@echo "$(BLUE)Installing REST API service only...$(NC)"
+	@echo "$(BLUE)Installing REST API service using scripts...$(NC)"
 	@$(MAKE) build
 	@echo "$(BLUE)Installing binary to $(INSTALL_PREFIX)...$(NC)"
 	@sudo install -D -m 755 $(BUILD_DIR)/$(BINARY_NAME) $(INSTALL_PREFIX)/$(BINARY_NAME)
 	@echo "$(GREEN)✅ Binary installed$(NC)"
-
-# Create directories
-	@sudo mkdir -p $(BACKUP_CONFIG_DIR) $(SERVICE_BACKUP_DIR)
-	@sudo mkdir -p /var/log/backup-service
-	@sudo chown $(SERVICE_USER):$(SERVICE_USER) /var/log/backup-service 2>/dev/null || echo "$(YELLOW)Note: User $(SERVICE_USER) will be created below$(NC)"
-
-# Create service user
-	@echo "$(BLUE)Checking user $(SERVICE_USER)...$(NC)"
-	@if ! id $(SERVICE_USER) >/dev/null 2>&1; then \
-		echo "$(BLUE)Creating user $(SERVICE_USER)...$(NC)"; \
-		sudo useradd -r -s /bin/false -d /var/lib/$(SERVICE_NAME) $(SERVICE_USER); \
-	else \
-		echo "$(GREEN)✓ User $(SERVICE_USER) already exists$(NC)"; \
-	fi
-
-# Install systemd service
-	@echo "$(BLUE)Installing REST API systemd service...$(NC)"
-	@sed -e "s|{{EXEC_PATH}}|$(INSTALL_PREFIX)/$(BINARY_NAME)|g; \
-	     s|{{CONFIG_DIR}}|$(BACKUP_CONFIG_DIR)|g; \
-	     s|{{BACKUP_DIR}}|$(SERVICE_BACKUP_DIR)|g; \
-	     s|{{SERVICE_PORT}}|$(INSTALL_PORT)|g; \
-	     s|{{SERVICE_USER}}|$(SERVICE_USER)|g" \
-	     backup-service-rest.service.template > backup-service-rest.service
-	@sudo cp backup-service-rest.service $(SERVICE_DIR)/backup-service-rest.service
-	@sudo systemctl daemon-reload
-	@sudo systemctl enable backup-service-rest
-
-# Set permissions
-	@sudo chown -R $(SERVICE_USER):$(SERVICE_USER) $(SERVICE_BACKUP_DIR) 2>/dev/null || true
-	@sudo chown $(SERVICE_USER):$(SERVICE_USER) /var/log/backup-service 2>/dev/null || true
+	@echo "$(BLUE)Installing systemd service using install-backup-service.sh...$(NC)"
+	@sudo ./scripts/install-backup-service.sh rest $(SERVICE_USER) $(INSTALL_PORT) $(BACKUP_CONFIG_DIR) $(SERVICE_BACKUP_DIR)
 
 	@echo ""
 	@echo "$(GREEN)🎉 REST API service installation completed!$(NC)"
@@ -616,6 +519,8 @@ install-cronjob:
 	@echo "$(BLUE)Installing binary to $(INSTALL_PREFIX)...$(NC)"
 	@sudo install -D -m 755 $(BUILD_DIR)/$(BINARY_NAME) $(INSTALL_PREFIX)/$(BINARY_NAME)
 	@echo "$(GREEN)✅ Binary installed$(NC)"
+	@echo "$(BLUE)Installing cronjob systemd service using install-backup-service.sh...$(NC)"
+	@sudo ./scripts/install-backup-service.sh cronjob $(USER) $(INSTALL_PORT) $(BACKUP_CONFIG_DIR) $(SERVICE_BACKUP_DIR)
 
 # Create directories
 	@sudo mkdir -p $(BACKUP_CONFIG_DIR) $(SERVICE_BACKUP_DIR)
@@ -659,37 +564,57 @@ install-cronjob:
 	@echo "  make service-start-cronjob USER=$(USER)    # Start cronjob service"
 	@echo "  make service-status-cronjob USER=$(USER)   # Check cronjob service status"
 
-# Service management for separated services
+# Service management using scripts
+.PHONY: service-start
+service-start:
+	@echo "$(BLUE)Starting backup service...$(NC)"
+	@sudo ./scripts/manage-backup-service.sh start combined
+
+.PHONY: service-stop
+service-stop:
+	@echo "$(BLUE)Stopping backup service...$(NC)"
+	@sudo ./scripts/manage-backup-service.sh stop combined
+
+.PHONY: service-restart
+service-restart:
+	@echo "$(BLUE)Restarting backup service...$(NC)"
+	@sudo ./scripts/manage-backup-service.sh restart combined
+
+.PHONY: service-status
+service-status:
+	@echo "$(BLUE)Backup Service Status:$(NC)"
+	@echo "$(YELLOW)================================$(NC)"
+	@sudo ./scripts/manage-backup-service.sh status combined
+
+.PHONY: service-logs
+service-logs:
+	@echo "$(BLUE)Showing backup service logs (Ctrl+C to exit):$(NC)"
+	@echo "$(YELLOW)================================$(NC)"
+	@sudo ./scripts/manage-backup-service.sh logs combined
+
+# REST API service management
 .PHONY: service-start-rest
 service-start-rest:
 	@echo "$(BLUE)Starting REST API service...$(NC)"
 	@echo "$(YELLOW)Using backup directory: $(SERVICE_BACKUP_DIR)$(NC)"
-	@sudo systemctl start backup-service-rest
-	@if sudo systemctl is-active --quiet backup-service-rest; then \
-		echo "$(GREEN)✅ REST API service started successfully!$(NC)"; \
-	else \
-		echo "$(RED)❌ Failed to start REST API service$(NC)"; \
-		echo "$(YELLOW)Check logs with: make service-logs-rest$(NC)"; \
-		exit 1; \
-	fi
+	@sudo ./scripts/manage-backup-service.sh start rest
 
 .PHONY: service-stop-rest
 service-stop-rest:
 	@echo "$(BLUE)Stopping REST API service...$(NC)"
-	@sudo systemctl stop backup-service-rest
-	@echo "$(GREEN)✅ REST API service stopped$(NC)"
+	@sudo ./scripts/manage-backup-service.sh stop rest
 
 .PHONY: service-status-rest
 service-status-rest:
 	@echo "$(BLUE)REST API Service Status:$(NC)"
 	@echo "$(YELLOW)================================$(NC)"
-	@sudo systemctl status backup-service-rest --no-pager || echo "$(RED)Service not found$(NC)"
+	@sudo ./scripts/manage-backup-service.sh status rest
 
 .PHONY: service-logs-rest
 service-logs-rest:
 	@echo "$(BLUE)Showing REST API service logs (Ctrl+C to exit):$(NC)"
 	@echo "$(YELLOW)================================$(NC)"
-	@sudo journalctl -u backup-service-rest -f
+	@sudo ./scripts/manage-backup-service.sh logs rest
 
 .PHONY: service-start-cronjob
 ifndef USER
@@ -699,14 +624,7 @@ endif
 service-start-cronjob:
 	@echo "$(BLUE)Starting cronjob service for user '$(USER)'...$(NC)"
 	@echo "$(YELLOW)Using backup directory: $(SERVICE_BACKUP_DIR)$(NC)"
-	@sudo systemctl start backup-service-cronjob@$(USER)
-	@if sudo systemctl is-active --quiet backup-service-cronjob@$(USER); then \
-		echo "$(GREEN)✅ Cronjob service started successfully!$(NC)"; \
-	else \
-		echo "$(RED)❌ Failed to start cronjob service$(NC)"; \
-		echo "$(YELLOW)Check logs with: make service-logs-cronjob USER=$(USER)$(NC)"; \
-		exit 1; \
-	fi
+	@sudo ./scripts/manage-backup-service.sh start cronjob $(USER)
 
 .PHONY: service-stop-cronjob
 ifndef USER
@@ -715,8 +633,7 @@ endif
 
 service-stop-cronjob:
 	@echo "$(BLUE)Stopping cronjob service for user '$(USER)'...$(NC)"
-	@sudo systemctl stop backup-service-cronjob@$(USER)
-	@echo "$(GREEN)✅ Cronjob service stopped$(NC)"
+	@sudo ./scripts/manage-backup-service.sh stop cronjob $(USER)
 
 .PHONY: service-status-cronjob
 ifndef USER
@@ -726,7 +643,7 @@ endif
 service-status-cronjob:
 	@echo "$(BLUE)Cronjob Service Status ($(USER)):$(NC)"
 	@echo "$(YELLOW)=====================================$(NC)"
-	@sudo systemctl status backup-service-cronjob@$(USER) --no-pager || echo "$(RED)Service not found$(NC)"
+	@sudo ./scripts/manage-backup-service.sh status cronjob $(USER)
 
 .PHONY: service-logs-cronjob
 ifndef USER
@@ -736,4 +653,4 @@ endif
 service-logs-cronjob:
 	@echo "$(BLUE)Showing cronjob service logs for '$(USER)' (Ctrl+C to exit):$(NC)"
 	@echo "$(YELLOW)==================================================$(NC)"
-	@sudo journalctl -u backup-service-cronjob@$(USER) -f
+	@sudo ./scripts/manage-backup-service.sh logs cronjob $(USER)

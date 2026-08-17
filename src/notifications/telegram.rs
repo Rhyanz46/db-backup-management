@@ -281,6 +281,28 @@ impl TelegramNotifier {
         self.send_message(&message).await
     }
 
+    pub async fn send_cronjob_skip_notification(
+        &self,
+        job_name: &str,
+        job_schedule: &str,
+        skip_reason: &str,
+    ) -> Result<()> {
+        let message = format!(
+            "⚠️ *Cronjob Execution Skipped*\n\n\
+            *Job:* {}\n\
+            *Schedule:* {}\n\
+            *Skip Reason:* {}\n\
+            *Time:* {}\n\n\
+            _Note: This execution was skipped gracefully and will be retried according to schedule._",
+            job_name,
+            job_schedule,
+            skip_reason,
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
+        );
+
+        self.send_message(&message).await
+    }
+
     async fn send_message(&self, message: &str) -> Result<()> {
         let chat_id = ChatId(self.chat_id.parse()
             .context("Invalid chat ID format")?);

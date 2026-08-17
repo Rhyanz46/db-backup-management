@@ -1,0 +1,54 @@
+# Rust-analyzer configuration for backup-service project
+
+cargo.loadOutDirsFromCheck = true
+cargo.features = "all"
+
+# Diagnostics
+checkOnSave.command = "clippy"
+diagnostics.disabled = ["unresolved-proc-macro"]
+diagnostics.enable = false
+# diagnostics.enable = true
+
+# Completion
+completion.autoimport.enable = true
+completion.autoself.enable = true
+completion.addCallParentheses = true
+completion.addCallArgumentSnippets = true
+
+# Inlay hints
+inlayHints.typeHints.enable = true
+inlayHints.parameterHints.enable = true
+inlayHints.chainingHints.enable = true
+inlayHints.lifetimeElisionHints.enable = "skip_trivial"
+inlayHints.closingBraceHints.enable = true
+inlayHints.closureReturnTypeHints.enable = "always"
+inlayHints.reborrowHints.enable = "mutable"
+inlayHints.closureCaptureHints.enable = true
+
+# Lens (code lenses)
+lens.run.enable = true
+lens.debug.enable = true
+lens.implementations.enable = true
+lens.references.adt.enable = true
+lens.references.enumVariant.enable = true
+lens.references.method.enable = true
+lens.references.trait.enable = true
+lens.methodReferences.enable = true
+lens.enumVariantReferences.enable = true
+
+# Imports
+imports.granularity.group = "module"
+imports.preferNoStd = false
+imports.prefix = "crate"
+
+# Hover
+hover.actions.references.enable = true
+hover.actions.implementations.enable = true
+hover.actions.gotoTypeDef.enable = true
+hover.actions.run.enable = true
+hover.documentation.enable = true
+hover.documentation.keywords.enable = true
+
+# Files and project
+files.excludeDirs = ["target", "node_modules"]
+workspace.symbol.search.scope = "workspace"

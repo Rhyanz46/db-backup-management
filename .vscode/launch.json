@@ -1,0 +1,146 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "🔬 LLDB Debug (Interactive CLI)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/target/debug/backup-service",
+            "args": ["run"],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "cargo: build",
+            "environment": [
+                {
+                    "name": "RUST_LOG",
+                    "value": "debug"
+                },
+                {
+                    "name": "RUST_BACKTRACE",
+                    "value": "1"
+                }
+            ],
+            "console": "integratedTerminal",
+            "sourceLanguages": ["rust"]
+        },
+        {
+            "name": "🔬 LLDB Debug Connection",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/target/debug/backup-service",
+            "args": ["debug", "--test-all-hosts"],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "cargo: build",
+            "environment": [
+                {
+                    "name": "RUST_LOG",
+                    "value": "debug"
+                },
+                {
+                    "name": "RUST_BACKTRACE",
+                    "value": "1"
+                }
+            ],
+            "console": "integratedTerminal",
+            "sourceLanguages": ["rust"]
+        },
+        {
+            "name": "🔬 LLDB Debug Backup",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/target/debug/backup-service",
+            "args": ["backup"],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "cargo: build",
+            "environment": [
+                {
+                    "name": "RUST_LOG",
+                    "value": "debug"
+                },
+                {
+                    "name": "RUST_BACKTRACE",
+                    "value": "1"
+                }
+            ],
+            "console": "integratedTerminal",
+            "sourceLanguages": ["rust"]
+        },
+        {
+            "name": "🚀 Run List Backups",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "cargo",
+            "args": ["run", "list"],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "RUST_LOG": "debug"
+            },
+            "problemMatcher": ["$rustc"],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        },
+        {
+            "name": "🚀 Run Backup",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "cargo",
+            "args": ["run", "backup"],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "RUST_LOG": "debug"
+            },
+            "problemMatcher": ["$rustc"]
+        },
+        {
+            "name": "🚀 Run Test Connection",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "cargo",
+            "args": ["run", "test"],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "RUST_LOG": "debug"
+            },
+            "problemMatcher": ["$rustc"]
+        },
+        {
+            "name": "🔍 Debug Connection (All Hosts)",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "cargo",
+            "args": ["run", "debug", "--test-all-hosts"],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "RUST_LOG": "debug"
+            },
+            "problemMatcher": ["$rustc"]
+        },
+        {
+            "name": "🐛 Debug Single Host",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "cargo",
+            "args": ["run", "debug", "--host", "172.18.0.2", "--ssl-mode", "disable"],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "RUST_LOG": "debug"
+            },
+            "problemMatcher": ["$rustc"]
+        },
+        {
+            "name": "🌐 Start API Server",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "cargo",
+            "args": ["run", "server"],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "RUST_LOG": "debug"
+            },
+            "problemMatcher": ["$rustc"]
+        }
+    ]
+}

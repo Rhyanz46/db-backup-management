@@ -1,0 +1,146 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "cargo: check",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["check"],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "clear": false
+            },
+            "problemMatcher": ["$rustc"]
+        },
+        {
+            "label": "cargo: build (debug)",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["build"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "clear": false,
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true
+            },
+            "problemMatcher": ["$rustc"]
+        },
+        {
+            "label": "cargo: run (interactive)",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["run", "run"],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "clear": false,
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true
+            },
+            "problemMatcher": ["$rustc"]
+        },
+        {
+            "label": "cargo: run list",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["run", "list"],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "clear": false,
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": ["$rustc"]
+        },
+        {
+            "label": "cargo: run backup",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["run", "backup"],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "clear": false,
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": ["$rustc"]
+        },
+        {
+            "label": "cargo: run test",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["run", "test"],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "clear": false,
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": ["$rustc"]
+        },
+        {
+            "label": "cargo: run debug (all hosts)",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["run", "debug", "--test-all-hosts"],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "clear": false,
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": ["$rustc"]
+        },
+        {
+            "label": "cargo: run server",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["run", "server"],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "clear": false,
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": ["$rustc"]
+        },
+        {
+            "label": "cargo: test (unit tests)",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["test"],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "clear": false,
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": ["$rustc"]
+        },
+        {
+            "label": "cargo: clean",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["clean"],
+            "group": "build",
+            "presentation": {
+                "reveal": "silent",
+                "clear": false
+            },
+            "problemMatcher": ["$rustc"]
+        }
+    ]
+}

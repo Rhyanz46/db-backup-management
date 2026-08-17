@@ -364,6 +364,28 @@ async fn execute_cronjob(job_id: &str, config_dir: &str, backup_dir: &str) -> Re
         ).await;
     }
 
+    // Check if there's an active server available before executing backup
+    if !check_server_availability(config_dir).await? {
+        info!("No active server available - skipping cronjob execution: {}", job.name);
+        println!("⚠️  Skipping cronjob '{}' - no active server configured", job.name);
+
+        // Send skip notification
+        if let Some(ref notifier) = telegram_notifier {
+            let _ = notifier.send_cronjob_skip_notification(
+                &job.name,
+                &job.schedule_type.get_description(),
+                "No active server configured"
+            ).await;
+        }
+
+        return Ok(CronjobExecutionResult {
+            success: true,
+            backup_info: CronjobBackupInfo::default(),
+            duration_seconds: start_time.elapsed().as_secs(),
+            error_message: Some("Skipped - No active server".to_string()),
+        });
+    }
+
     // Get job details to construct proper command
     let mut cmd = Command::new("backup-service");
     cmd.arg("backup")
@@ -428,6 +450,96 @@ async fn execute_cronjob(job_id: &str, config_dir: &str, backup_dir: &str) -> Re
             duration_seconds,
             error_message: Some(error_msg.to_string()),
         })
+    }
+}
+
+/// Check if there's an active server available for backup
+async fn check_server_availability(config_dir: &str) -> Result<bool> {
+    use crate::config::ServerManager;
+    use crate::database::DatabaseConnection;
+    use crate::notifications::TelegramNotifier;
+    use crate::config::TelegramManager;
+
+    let mut server_manager = ServerManager::new(config_dir);
+
+    // Load server configuration
+    if let Err(e) = server_manager.load() {
+        warn!("Failed to load server configuration: {}", e);
+
+        // Try to send error notification
+        let mut telegram_manager = TelegramManager::new(config_dir);
+        if telegram_manager.load().is_ok() && telegram_manager.is_enabled() {
+            if let Some(telegram_config) = telegram_manager.get_config() {
+                if let Ok(notifier) = TelegramNotifier::new(&telegram_config) {
+                    let _ = notifier.send_error_notification(
+                        "Cronjob Server Check",
+                        "Unknown",
+                        &format!("Failed to load server configuration: {}", e)
+                    ).await;
+                }
+            }
+        }
+
+        return Ok(false);
+    }
+
+    // Check if there's an active server
+    let active_server = match server_manager.get_active_server() {
+        Some(server) => server,
+        None => {
+            info!("No active server configured");
+
+            // Try to send notification about no active server
+            let mut telegram_manager = TelegramManager::new(config_dir);
+            if telegram_manager.load().is_ok() && telegram_manager.is_enabled() {
+                if let Some(telegram_config) = telegram_manager.get_config() {
+                    if let Ok(notifier) = TelegramNotifier::new(&telegram_config) {
+                        let _ = notifier.send_error_notification(
+                            "Cronjob Server Check",
+                            "No Active Server",
+                            "No active server configured in the configuration"
+                        ).await;
+                    }
+                }
+            }
+
+            return Ok(false);
+        }
+    };
+
+    // Test connection to the active server
+    match DatabaseConnection::test_connection(active_server).await {
+        Ok(_) => {
+            debug!("Active server '{}' is available", active_server.display_name());
+            Ok(true)
+        }
+        Err(e) => {
+            let error_msg = format!("Server '{}' is not available: {}", active_server.display_name(), e);
+            warn!("{}", error_msg);
+
+            // Send connection failure notification
+            let mut telegram_manager = TelegramManager::new(config_dir);
+            if telegram_manager.load().is_ok() && telegram_manager.is_enabled() {
+                if let Some(telegram_config) = telegram_manager.get_config() {
+                    if let Ok(notifier) = TelegramNotifier::new(&telegram_config) {
+                        let _ = notifier.send_error_notification(
+                            "Cronjob Database Connection",
+                            &active_server.display_name(),
+                            &e.to_string()
+                        ).await;
+
+                        // Also send detailed server information
+                        let _ = notifier.send_error_notification(
+                            "Cronjob Connection Details",
+                            &format!("{} ({})", active_server.display_name(), active_server.connection_string()),
+                            &e.to_string()
+                        ).await;
+                    }
+                }
+            }
+
+            Ok(false)
+        }
     }
 }
 

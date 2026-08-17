@@ -111,26 +111,182 @@ The compiled binary will be available at `target/release/backup-service`.
 
 ## Usage
 
-### Using Makefile (Recommended)
+### Basic Commands
 
 ```bash
-# Build the project
+# Start interactive CLI
+./backup-service run
+
+# Start REST API server
+./backup-service server --port 8080
+
+# Start REST API only (no cronjob)
+./backup-service server --start-rest --port 8080
+
+# Start cronjob only (no REST API)
+./backup-service server --start-cronjob
+
+# Quick backup
+./backup-service backup
+
+# List backups
+./backup-service list
+```
+
+## Makefile Commands
+
+### 🚀 Quick Start
+
+```bash
+# Install system dependencies and build
+make setup
+
+# Build in release mode
 make build
-
-# Run interactive CLI
-make run-cli
-
-# Run REST server on default port (8080)
-make run-server
-
-# Run REST server with custom port
-make run-server-port
-
-# Install as systemd service
-make install
 
 # View all available commands
 make help
+```
+
+### 📦 Installation & Deployment
+
+#### Standard Installation (Combined Service)
+```bash
+# Install with default port (8080)
+make install
+
+# Install with custom port
+make install PORT=8237
+
+# Quick install for development (port 8080)
+make install-dev
+
+# Quick install for production (port 3724)
+make install-prod
+```
+
+#### Separated Services Installation
+```bash
+# Install REST API service only
+make install-rest BACKUP_DIR=/home/dev/backups
+
+# Install cronjob service with custom user
+make install-cronjob USER=dev BACKUP_DIR=/home/dev/db-backup-list
+
+# Install cronjob for different users
+make install-cronjob USER=admin BACKUP_DIR=/var/lib/backups
+make install-cronjob USER=root BACKUP_DIR=/opt/backups
+```
+
+### 🔧 Service Management
+
+#### Combined Service Management
+```bash
+# Start/stop service
+make service-start
+make service-stop
+make service-restart
+
+# Check status and logs
+make service-status
+make service-logs
+make service-debug
+```
+
+#### Separated Service Management
+```bash
+# REST API service management
+make service-start-rest
+make service-stop-rest
+make service-status-rest
+make service-logs-rest
+
+# Cronjob service management (requires USER parameter)
+make service-start-cronjob USER=dev
+make service-stop-cronjob USER=dev
+make service-status-cronjob USER=dev
+make service-logs-cronjob USER=dev
+
+# Start services with custom backup directory
+make service-start-cronjob USER=dev BACKUP_DIR=/home/dev/db-backup-list
+make service-start-rest BACKUP_DIR=/var/lib/postgresql-backups
+```
+
+### 🔨 Development Commands
+
+```bash
+# Build commands
+make build                    # Build in release mode
+make clean                    # Clean build artifacts
+make rebuild                  # Clean and rebuild
+make check                    # Run cargo check and clippy
+make test                     # Run tests
+
+# Development server
+make dev-server               # Run server in development mode
+make dev-cli                  # Run CLI in development mode
+
+# Debug connections
+make debug PORT=5432
+```
+
+### 🛠️ System Management
+
+```bash
+# Install dependencies (Linux)
+make install-deps
+
+# Deployment management
+make update-and-deploy        # Git pull → build → deploy → restart
+make check-deployment         # Verify installation health
+
+# Firewall configuration
+make firewall-setup PORT=8237
+
+# Uninstallation (keeps data)
+make uninstall
+
+# Complete uninstall (removes data)
+make uninstall-data
+```
+
+### 📁 Custom Paths Configuration
+
+```bash
+# Install with custom backup directory
+make install BACKUP_DIR=/custom/backup/path
+
+# Start services with custom paths
+make service-start BACKUP_DIR=/home/user/backups
+make service-start-cronjob USER=dev BACKUP_DIR=/home/dev/postgresql-backups
+
+# Build with custom prefix
+make build INSTALL_PREFIX=/opt/local/bin
+```
+
+## Configuration
+
+### Default Paths
+- **Config Directory**: `/etc/backup-service/config`
+- **Backup Directory**: `/etc/backup-service/backup` (default)
+- **Log Directory**: `/var/log/backup-service`
+- **Binary**: `/usr/local/bin/backup-service`
+
+### Environment Variables
+You can override default paths using environment variables:
+
+```bash
+# Custom configuration directory
+export BACKUP_CONFIG_DIR=/custom/config
+
+# Custom backup directory
+export BACKUP_DIR=/custom/backups
+
+# Custom log directory
+export LOG_DIR=/custom/logs
+
+# Start with custom paths
+./backup-service server --config-dir $BACKUP_CONFIG_DIR --backup-dir $BACKUP_DIR
 ```
 
 ### Direct Binary Usage
@@ -377,6 +533,209 @@ Enable debug logging:
 ```
 
 Logs will show detailed information about operations, errors, and system status.
+
+## Advanced Usage
+
+### 🕐 Cronjob Management
+
+#### Interactive Cronjob Configuration
+```bash
+# Open cronjob management menu
+./backup-service cronjob
+
+# Or via makefile
+make run-cronjob-menu
+```
+
+#### Cronjob Examples
+```bash
+# Create daily backup at 2 AM
+Schedule Type: Daily
+Hour: 2
+Minute: 0
+
+# Create hourly backup during business hours
+Schedule Type: Hours
+Interval: 1
+
+# Create weekly backup on Sunday at 3 AM
+Schedule Type: Weekly
+Day of Week: 0 (Sunday)
+Hour: 3
+Minute: 0
+
+# Create backup every 30 minutes
+Schedule Type: Minutes
+Interval: 30
+
+# Custom cron expression (every 6 hours)
+Schedule Type: Custom
+Cron Expression: 0 */6 * * *
+```
+
+#### Cronjob Features
+- ✅ **Hot-reload**: Config changes applied automatically without restart
+- ✅ **Server Validation**: Skips execution if database server is unavailable
+- ✅ **Failure Notifications**: Telegram alerts for configuration and connection issues
+- ✅ **Execution Statistics**: Track success/failure rates
+- ✅ **Skip Logic**: Graceful skipping instead of errors when server unavailable
+- ✅ **Auto-recovery**: Automatic recovery from corrupted configuration files
+
+### 📊 Hot-Reload Feature
+
+The cronjob scheduler monitors configuration file changes every 30 seconds:
+
+```bash
+# Modify cronjob configuration
+./backup-service cronjob
+# → Edit/Add/Remove jobs
+
+# Within 30 seconds, scheduler will:
+# 1. Detect file changes
+# 2. Reload configuration
+# 3. Update job schedules
+# 4. Log reload event
+# 5. Send Telegram notification (if configured)
+
+# Monitor reload events
+make service-logs-cronjob USER=dev
+```
+
+### 🔔 Telegram Notifications
+
+#### Supported Notifications
+- **Backup Success**: Server info, schemas, file size, duration
+- **Backup Failure**: Error details and retry suggestions
+- **Connection Test**: Server availability status
+- **Cronjob Events**: Schedule, success, failure, removal, skip
+- **Configuration Errors**: Invalid configs, connection failures
+- **Service Health**: Start/stop events
+
+#### Configure Telegram
+```bash
+# Interactive configuration
+./backup-service telegram-config
+
+# Or manually edit config
+sudo nano /etc/backup-service/config/telegram.json
+```
+
+### 🏗️ Production Deployment
+
+#### Multi-User Cronjob Setup
+```bash
+# Install cronjob for multiple users with different backup directories
+make install-cronjob USER=dev BACKUP_DIR=/home/dev/postgres-backups
+make install-cronjob USER=admin BACKUP_DIR=/opt/backups
+make install-cronjob USER=backup BACKUP_DIR=/var/lib/backup-service
+
+# Start all cronjob services
+make service-start-cronjob USER=dev
+make service-start-cronjob USER=admin
+make service-start-cronjob USER=backup
+
+# Monitor all services
+make service-status-cronjob USER=dev
+make service-status-cronjob USER=admin
+make service-status-cronjob USER=backup
+```
+
+#### Separate Services Architecture
+```bash
+# Architecture:
+# ├── REST API Service (port 8237)
+# │   └── Handles API calls and manual backups
+# └── Cronjob Services (multiple users)
+#     ├── backup-service-cronjob@dev
+#     ├── backup-service-cronjob@admin
+#     └── backup-service-cronjob@backup
+
+# Benefits:
+# ✅ Independent scaling
+# ✅ User isolation for security
+# ✅ Separate backup directories per user
+# ✅ Individual restart capability
+# ✅ Custom backup retention per user
+```
+
+### 🔍 Debugging & Troubleshooting
+
+#### Database Connection Debug
+```bash
+# Test connection to specific server
+./backup-service test --server production
+
+# Debug PostgreSQL connection with multiple hosts
+./backup-service debug --host votin.id --test-all-hosts
+
+# Debug with specific parameters
+./backup-service debug \
+  --host 172.18.0.2 \
+  --port 5432 \
+  --database suara_rakyat \
+  --username suararakyat \
+  --ssl-mode disable
+```
+
+#### Service Health Check
+```bash
+# Verify deployment health
+make check-deployment
+
+# Check specific service status
+make service-status
+make service-status-rest
+make service-status-cronjob USER=dev
+
+# View recent logs
+make service-debug
+make service-logs-rest
+make service-logs-cronjob USER=dev
+```
+
+#### Configuration Issues
+```bash
+# Validate cronjob configuration
+./backup-service cronjob
+# → Choose "List Cronjobs" to see current jobs
+
+# Check server configuration
+./backup-service run
+# → Choose "F. Server Management" → "A. List All Servers"
+
+# Test all configured servers
+./backup-service run
+# → Choose "F. Server Management" → "E. Test Connections"
+```
+
+### 📈 Performance Tips
+
+#### Large Database Optimization
+```bash
+# Backup specific schemas only
+./backup-service cronjob
+# → Edit job → Select specific schemas
+
+# Use custom backup directory with fast storage
+make install-cronjob USER=dev BACKUP_DIR=/mnt/ssd-backups
+
+# Adjust cronjob schedule for off-peak hours
+# Example: Daily at 3 AM when server load is minimal
+```
+
+#### Resource Management
+```bash
+# Monitor resource usage
+systemctl status backup-service-cronjob@dev
+systemctl status backup-service-rest
+
+# Check log file sizes
+sudo du -sh /var/log/backup-service/
+
+# Backup rotation (manually delete old files)
+sudo ls -la /home/dev/postgres-backups/
+sudo rm old_backup_*.sql
+```
 
 ## Development
 
